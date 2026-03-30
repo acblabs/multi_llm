@@ -1,3 +1,0 @@
-google-cloud-aiplatform[agent_engines,adk]>=1.112
-litellm>=1.63.0
-python-dotenv>=1.0.1
