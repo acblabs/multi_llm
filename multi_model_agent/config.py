@@ -1,8 +1,8 @@
 MODEL_CONFIG = {
-    "openai": "gpt-5.4",
-    "claude": "anthropic/claude-opus-4-6",
-    "grok": "xai/grok-4",
-    "gemini": "gemini-2.5-pro",
+    "openai": "gpt-5.6",
+    "claude": "anthropic/claude-opus-4-8",
+    "grok": "xai/grok-4.3",
+    "gemini": "gemini-3.5-flash",
 }
 
 PRICING = {
