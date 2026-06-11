@@ -75,7 +75,7 @@ class GovernanceTests(unittest.TestCase):
             ]
         )
 
-        result = redact_before_model(context=None, llm_request=request)
+        result = redact_before_model(callback_context=None, llm_request=request)
 
         redacted_text = request.contents[0].parts[0].text
         self.assertIsNone(result)
@@ -100,7 +100,7 @@ class GovernanceTests(unittest.TestCase):
             ]
         )
 
-        redact_before_model(context=_FakeContext(state), llm_request=llm_request)
+        redact_before_model(callback_context=_FakeContext(state), llm_request=llm_request)
         trace_id = state["trace_id"]
 
         def fake_completion(provider, model, api_key, prompt, trace_id):
@@ -146,7 +146,7 @@ class GovernanceTests(unittest.TestCase):
             ]
         )
 
-        redact_before_model(context=context, llm_request=request)
+        redact_before_model(callback_context=context, llm_request=request)
 
         trace_id = context.state.values["trace_id"]
         self.assertTrue(trace_id)
@@ -171,7 +171,7 @@ class GovernanceTests(unittest.TestCase):
             ]
         )
 
-        redact_before_model(context=None, llm_request=request)
+        redact_before_model(callback_context=None, llm_request=request)
 
         self.assertIn("[PATIENT_NAME]", request.contents[0].parts[0].text)
         self.assertEqual(request.contents[0].parts[1].inline_data.data, b"Patient: Jane Doe")

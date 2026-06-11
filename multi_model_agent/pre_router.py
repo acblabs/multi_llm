@@ -7,9 +7,13 @@ from .observability import ensure_trace_id, new_trace_id
 from .privacy import redact_sensitive_data
 
 
-def redact_before_model(context: Any, llm_request: LlmRequest):
-    """Redact PHI/PII from text parts before the Gemini router model call."""
-    trace_id = _trace_id_from_context(context)
+def redact_before_model(callback_context: Any, llm_request: LlmRequest):
+    """Redact PHI/PII from text parts before the Gemini router model call.
+
+    Parameter names match the ADK before_model_callback contract: ADK invokes
+    this as ``callback(callback_context=..., llm_request=...)``.
+    """
+    trace_id = _trace_id_from_context(callback_context)
     redaction_count = 0
     finding_kinds: set[str] = set()
 
