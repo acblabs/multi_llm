@@ -1,0 +1,15 @@
+policy:
+  name: prior-auth-high-risk-screening
+  status: mvp_documentation_only
+  input_screening:
+    prompt_injection: medium_and_above
+    jailbreak: medium_and_above
+    sensitive_data: redact
+    malicious_url: block
+  output_screening:
+    sensitive_data: block
+    harmful_content: block
+    clinical_overreach: escalate
+  notes:
+    - Verify selected GCP safety-screening service and filter names before deployment.
+    - Local privacy and policy controls remain mandatory even when managed screening is enabled.

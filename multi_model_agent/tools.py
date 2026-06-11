@@ -1,75 +1,41 @@
 import os
-import time
-import random
+
 from .config import MODEL_CONFIG
+from .governance import (
+    GovernanceBlockedError,
+    governance_failure_message,
+    prepare_provider_request,
+    record_provider_failure,
+    record_provider_success,
+)
 from .metrics import log_usage
-
-# =====================================================
-# ERROR CLASSIFICATION
-# =====================================================
-
-def classify_error(e: Exception) -> str:
-    msg = str(e).lower()
-
-    # --- Retryable errors ---
-    if "timeout" in msg or "connection" in msg:
-        return "retry"
-
-    if "rate_limit" in msg or "429" in msg:
-        return "retry"
-
-    # --- Immediate fallback errors ---
-    if "overloaded" in msg:
-        return "fallback"
-
-    if "internal_server_error" in msg or "500" in msg:
-        return "fallback"
-
-    # --- Fail fast ---
-    if "authentication" in msg or "api key" in msg:
-        return "fail"
-
-    if "invalid_request" in msg or "400" in msg:
-        return "fail"
-
-    return "fallback"
+from .observability import ensure_trace_id
+from .reliability import classify_error, retry_with_backoff
 
 
-# =====================================================
-# RETRY WITH BACKOFF (ERROR-AWARE)
-# =====================================================
-
-def retry_with_backoff(func, max_retries=3, base_delay=1.0):
-    def wrapper(*args, **kwargs):
-        for attempt in range(max_retries):
-            try:
-                return func(*args, **kwargs)
-
-            except Exception as e:
-                error_type = classify_error(e)
-
-                # Only retry retryable errors
-                if error_type != "retry":
-                    raise e
-
-                if attempt == max_retries - 1:
-                    raise e
-
-                delay = base_delay * (2 ** attempt)
-                jitter = random.uniform(0.1, 0.3) * delay
-                time.sleep(delay + jitter)
-
-        return None
-    return wrapper
+FALLBACK_CHAIN = {
+    "claude": ["openai", "grok"],
+    "openai": ["claude", "grok"],
+    "grok": ["openai", "claude"],
+}
 
 
-# =====================================================
-# CORE LITELLM CALL
-# =====================================================
+def _api_key_for(provider: str) -> str | None:
+    env_vars = {
+        "openai": "OPENAI_API_KEY",
+        "claude": "ANTHROPIC_API_KEY",
+        "grok": "XAI_API_KEY",
+    }
+    return os.getenv(env_vars[provider])
 
-def _call_litellm_with_retry(model, api_key, prompt):
 
-    @retry_with_backoff
+def _call_litellm_with_retry(
+    provider: str,
+    model: str,
+    api_key: str | None,
+    prompt: str,
+    trace_id: str,
+):
     def _inner():
         import litellm
 
@@ -81,109 +47,138 @@ def _call_litellm_with_retry(model, api_key, prompt):
 
         content = response["choices"][0]["message"]["content"]
         tokens = response.get("usage", {}).get("total_tokens", 0)
-
         return content, tokens
 
-    return _inner()
+    return retry_with_backoff(_inner, trace_id=trace_id, provider=provider)
 
 
-# =====================================================
-# FALLBACK CHAIN (PRIORITY ORDER)
-# =====================================================
-
-FALLBACK_CHAIN = {
-    "claude": ["openai", "grok"],
-    "openai": ["claude", "grok"],
-    "grok": ["openai", "claude"],
-}
+def graceful_failure() -> str:
+    return "Unable to complete request due to provider issues. Please try again."
 
 
-# =====================================================
-# GRACEFUL FAILURE
-# =====================================================
-
-def graceful_failure():
-    return "⚠️ Unable to complete request due to provider issues. Please try again."
-
-
-# =====================================================
-# FALLBACK HANDLER (ERROR-AWARE)
-# =====================================================
-
-def _handle_fallback(provider: str, prompt: str, error: Exception) -> str:
-    error_type = classify_error(error)
-
-    # --- Fail fast ---
-    if error_type == "fail":
+def _handle_fallback(
+    provider: str,
+    prompt: str,
+    error: Exception,
+    trace_id: str | None,
+) -> str:
+    if classify_error(error) == "fail":
         return graceful_failure()
 
-    # --- Fallback ---
-    fallback_providers = FALLBACK_CHAIN.get(provider, [])
-
-    for fallback in fallback_providers:
+    for fallback in FALLBACK_CHAIN.get(provider, []):
         try:
-            if fallback == "openai":
-                return call_openai(prompt, fallback_allowed=False)
-
-            elif fallback == "claude":
-                return call_claude(prompt, fallback_allowed=False)
-
-            elif fallback == "grok":
-                return call_grok(prompt, fallback_allowed=False)
-
+            return _call_provider(
+                fallback,
+                prompt,
+                fallback_allowed=False,
+                trace_id=trace_id,
+                propagate_failure=True,
+            )
         except Exception:
             continue
 
     return graceful_failure()
 
 
-# =====================================================
-# TOOL FUNCTIONS
-# =====================================================
+def _call_provider(
+    provider: str,
+    prompt: str,
+    fallback_allowed: bool = True,
+    trace_id: str | None = None,
+    propagate_failure: bool = False,
+) -> str:
+    request = None
+    context = None
 
-def call_openai(prompt: str, fallback_allowed=True) -> str:
     try:
-        content, tokens = _call_litellm_with_retry(
-            MODEL_CONFIG["openai"],
-            os.getenv("OPENAI_API_KEY"),
-            prompt
+        request, context, _ = prepare_provider_request(
+            provider=provider,
+            prompt=prompt,
+            trace_id=trace_id,
         )
-        log_usage("openai", tokens)
+        content, tokens = _call_litellm_with_retry(
+            provider,
+            MODEL_CONFIG[provider],
+            _api_key_for(provider),
+            request.prompt,
+            request.trace_id,
+        )
+        log_usage(provider, tokens)
+        record_provider_success(
+            trace_id=request.trace_id,
+            provider=provider,
+            tokens=tokens,
+            risk_tier=context.risk.risk_tier,
+        )
         return content
 
-    except Exception as e:
+    except GovernanceBlockedError as error:
+        return governance_failure_message(error)
+
+    except Exception as error:
+        if request is not None:
+            record_provider_failure(
+                trace_id=request.trace_id,
+                provider=provider,
+                error=error,
+                action=classify_error(error),
+                risk_tier=request.risk_tier,
+            )
+
+        if propagate_failure:
+            raise
+
         if fallback_allowed:
-            return _handle_fallback("openai", prompt, e)
+            return _handle_fallback(
+                provider,
+                prompt,
+                error,
+                trace_id=request.trace_id if request is not None else trace_id,
+            )
+
         return graceful_failure()
 
 
-def call_claude(prompt: str, fallback_allowed=True) -> str:
-    try:
-        content, tokens = _call_litellm_with_retry(
-            MODEL_CONFIG["claude"],
-            os.getenv("ANTHROPIC_API_KEY"),
-            prompt
-        )
-        log_usage("claude", tokens)
-        return content
+def _trace_id_from_tool_context(tool_context) -> str | None:
+    """Reuse the trace ID the pre-router callback stored in ADK session state so
+    tool-call governance events correlate with the rest of the invocation.
 
-    except Exception as e:
-        if fallback_allowed:
-            return _handle_fallback("claude", prompt, e)
-        return graceful_failure()
+    Returns None when no ADK tool context/state is available (direct calls or
+    tests), in which case the governance layer mints a fresh trace ID. The
+    parameter is named ``tool_context`` so ADK injects its ToolContext and
+    excludes it from the model-visible tool schema; this module stays free of
+    any ADK import.
+    """
+    if tool_context is None:
+        return None
+    state = getattr(tool_context, "state", None)
+    if state is None:
+        return None
+    return ensure_trace_id(state)
 
 
-def call_grok(prompt: str, fallback_allowed=True) -> str:
-    try:
-        content, tokens = _call_litellm_with_retry(
-            MODEL_CONFIG["grok"],
-            os.getenv("XAI_API_KEY"),
-            prompt
-        )
-        log_usage("grok", tokens)
-        return content
+def call_openai(prompt: str, fallback_allowed: bool = True, tool_context=None) -> str:
+    return _call_provider(
+        "openai",
+        prompt,
+        fallback_allowed=fallback_allowed,
+        trace_id=_trace_id_from_tool_context(tool_context),
+    )
 
-    except Exception as e:
-        if fallback_allowed:
-            return _handle_fallback("grok", prompt, e)
-        return graceful_failure()
+
+def call_claude(prompt: str, fallback_allowed: bool = True, tool_context=None) -> str:
+    return _call_provider(
+        "claude",
+        prompt,
+        fallback_allowed=fallback_allowed,
+        trace_id=_trace_id_from_tool_context(tool_context),
+    )
+
+
+def call_grok(prompt: str, fallback_allowed: bool = True, tool_context=None) -> str:
+    return _call_provider(
+        "grok",
+        prompt,
+        fallback_allowed=fallback_allowed,
+        trace_id=_trace_id_from_tool_context(tool_context),
+    )

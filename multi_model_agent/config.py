@@ -1,8 +1,11 @@
+import os
+
+
 MODEL_CONFIG = {
-    "openai": "gpt-5.5",
-    "claude": "anthropic/claude-opus-4-8",
-    "grok": "xai/grok-4.3",
-    "gemini": "gemini-3.5-flash",
+    "openai": os.getenv("OPENAI_MODEL", "gpt-5.5"),
+    "claude": os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8"),
+    "grok": os.getenv("XAI_MODEL", "xai/grok-4.3"),
+    "gemini": os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
 }
 
 PRICING = {

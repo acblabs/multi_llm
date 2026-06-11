@@ -1,5 +1,5 @@
-google-cloud-aiplatform[agent_engines,adk]>=1.112
-litellm
-python-dotenv
-pydantic>=2.6.4
-cloudpickle
+google-cloud-aiplatform[agent_engines,adk]>=1.112,<2.0
+litellm>=1.74,<2.0
+python-dotenv>=1.0,<2.0
+pydantic>=2.6.4,<3.0
+cloudpickle>=3.0,<4.0

@@ -1,166 +1,154 @@
-# 🚀 Multi-Model Agent  
-### Google ADK • Vertex AI Agent Engine • Multi-LLM Ensemble System
+# Governed Multi-LLM Agent Architecture
 
-<p align="center">
-  <b>Designing systems of models — not just using models</b>
-</p>
+Responsible AI control plane for a multi-LLM prior-authorization decision-support workflow.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Framework-Google%20ADK-blue" />
-  <img src="https://img.shields.io/badge/Platform-Vertex%20AI-orange" />
-  <img src="https://img.shields.io/badge/Architecture-Multi--Agent-green" />
-  <img src="https://img.shields.io/badge/Pattern-Ensemble%20LLM-purple" />
-  <img src="https://img.shields.io/badge/Focus-Orchestration-critical" />
-</p>
+This repo demonstrates how to keep the core multi-LLM engineering story intact while adding the governance controls expected in regulated healthcare AI: pre-router PHI/PII redaction, risk tiering, defense-in-depth redaction before third-party egress, approved-provider egress policy, human-in-the-loop escalation, retry/fallback safety, schema validation, observability, and audit evidence.
 
----
+This is an architecture MVP, not a production medical or coverage-decision system.
 
-## 🧠 Overview
-
-This project implements a **multi-model AI agent system** using the Google Agent Development Kit (ADK), designed to explore:
-
-> **How multiple LLMs can collaborate to outperform any single model**
-
-Instead of relying on one model, this system:
-
-- Executes **multiple LLMs in parallel**
-- Uses **Gemini as a meta-learner (synthesizer + contributor)**
-- Applies **ensemble + hybrid orchestration patterns**
-- Implements **retry, fallback, and reliability layers**
-- Supports **session memory + tracing**
-- Deploys to **Vertex AI Agent Engine**
-
----
-
-## 🔥 Core Insight
+## Architecture At A Glance
 
 ```text
-Better outputs come from diverse reasoning, not repeated reasoning
-🧬 Architecture
-🔥 Primary Pattern (Best Performing)
-User Prompt
-      ↓
-┌──────────────┬──────────────┬──────────────┐
-│   OpenAI     │    Claude    │     Grok     │
-│ (Structure)  │ (Reasoning)  │ (Creativity) │
-└──────┬───────┴──────┬───────┴──────┬───────┘
-       │              │              │
-       └──────────────┴──────────────┘
-                      ↓
-               ┌──────────────┐
-               │   Gemini     │
-               │ Synth + Build│
-               └──────┬───────┘
-                      ↓
-               Final Output
-🧩 System Components
-Component	Role
-Gemini	Orchestrator, synthesizer, and contributor
-OpenAI	Structured implementation and code quality
-Claude	Deep reasoning and robustness
-Grok	Exploration and alternative approaches
-LiteLLM	Unified API layer across providers
-Tools Layer	Execution interface for models
-Retry/Fallback	Reliability + fault tolerance
-Session Memory	Context persistence
-Tracing/Monitoring	Observability + debugging
-🧪 Experimental Results
-🏆 Code Quality Ranking
-Rank	Architecture
-🥇	Multi-LLM Parallel + Gemini
-🥈	Multi-LLM Sequential
-🥉	Single-LLM Parallel
-❌	Single-LLM Sequential
-📊 Key Findings
-⚡ ~55% fewer tokens vs sequential pipelines
-🧠 Higher quality outputs with parallel reasoning
-🔥 Multi-model > temperature-based variation
-🤖 Gemini performs best as meta-learner + builder
-🧠 Orchestration Patterns
-❌ Sequential (Weak)
-Model A → Model B → Model C
-Anchoring bias
-Context bloat
-Diminishing returns
-✅ Parallel (Best)
-Model A + Model B + Model C → Gemini
-Independent reasoning
-High diversity
-Strong synthesis
-🔥 Hybrid (Optimal)
-Parallel → Synthesis → Single refinement
-Best balance of cost + quality
-📁 Project Structure
-multi_model_agent/
-├── __init__.py
-├── agent.py          # Gemini orchestrator
-├── tools.py          # LLM tool wrappers
-├── config.py         # Model configuration
-├── metrics.py        # Token + cost tracking
-├── requirements.txt
-└── .env.example
-🔑 Features
-✅ Multi-LLM Ensemble
-Parallel execution across models
-True reasoning diversity (not temperature tricks)
-✅ Reliability Layer
-Retry with exponential backoff
-Error classification (retry / fallback / fail)
-Cross-model fallback chains
-✅ Observability
-Token usage tracking
-Cost estimation
-Debug-friendly architecture
-✅ Session Memory
-Persistent conversation state
-Native Agent Engine support
-✅ Production Deployment
-Vertex AI Agent Engine
-Scalable, managed runtime
-🚀 Getting Started
-1. Install dependencies
-pip install -r requirements.txt
-2. Configure environment
-OPENAI_API_KEY=your_key
-ANTHROPIC_API_KEY=your_key
-XAI_API_KEY=your_key
+User request
+  -> pre-router PHI/PII redaction
+  -> ADK/Gemini orchestrator inside managed GCP boundary
+  -> Responsible AI egress control plane
+       -> risk tiering
+       -> PHI/PII redaction for third-party providers
+       -> approved-provider egress policy
+       -> HITL escalation decision
+       -> audit trace
+  -> Multi-LLM data plane
+       -> OpenAI / Claude / Grok perspectives
+       -> Gemini synthesis
+       -> retry/fallback and cost tracking
+  -> decision-support output for human review
+```
 
-GOOGLE_GENAI_USE_VERTEXAI=TRUE
-3. Run locally
+The first vertical slice is prior-authorization summarization:
+
+```text
+Prior-auth request
+  -> pre-router PHI/PII redaction
+  -> Gemini router
+  -> risk tiering
+  -> defense-in-depth PHI/PII redaction before third-party egress
+  -> approved-provider egress policy
+  -> multi-LLM orchestration
+  -> HITL escalation
+  -> audit event
+  -> red-team eval evidence
+```
+
+## Multi-LLM Data Plane
+
+The agent still demonstrates modern AI orchestration:
+
+- provider diversity through LiteLLM;
+- Gemini as orchestrator and synthesizer;
+- provider-specific strengths from OpenAI, Claude, and Grok;
+- retry with backoff, fallback chains, and graceful degradation;
+- token and cost tracking.
+
+Default model versions:
+
+| Role | Provider | LiteLLM model ID |
+| --- | --- | --- |
+| Orchestrator / synthesizer | Gemini | `gemini-3.5-flash` |
+| Structured implementation perspective | OpenAI | `gpt-5.5` |
+| Deep reasoning perspective | Claude | `claude-opus-4-8` |
+| Alternative exploration perspective | Grok | `xai/grok-4.3` |
+
+## Responsible AI Control Plane
+
+The MVP governance path is implemented in code:
+
+| Control | File |
+| --- | --- |
+| Pre-router PHI/PII redaction | `multi_model_agent/pre_router.py` |
+| Risk tiering | `multi_model_agent/risk.py` |
+| PHI/PII redaction before third-party egress | `multi_model_agent/privacy.py` |
+| Provider egress policy | `multi_model_agent/policy.py` |
+| HITL escalation | `multi_model_agent/escalation.py` |
+| Audit trace | `multi_model_agent/audit.py` |
+| Schema contracts | `multi_model_agent/schemas.py` |
+| Retry/fallback safety | `multi_model_agent/reliability.py` |
+| Provider tool integration | `multi_model_agent/tools.py` |
+
+The ADK agent uses `before_model_callback=redact_before_model`, which redacts text in the Gemini router request before the model call. External provider calls are then prepared through `prepare_provider_request()`, which redacts sensitive data again and records privacy, risk, policy, and escalation events before egress to non-Google third-party LLMs.
+
+Trust boundary note: the local ADK process receives user input, but no model should receive raw PHI/PII by default. The MVP redacts the ADK model request before the Gemini router call and redacts again before third-party provider calls. Raw PHI/PII may still exist in ADK session state/history or platform logs before callback redaction; production requires ingest-time redaction before session write and strict content-logging controls.
+
+MVP redaction is text-only and destructive. That is intentional for the prior-auth demo because the human reviewer retains the source document, but production may require stable pseudonymous tokens and managed inspection for files, images, and attachments.
+
+## Evidence
+
+High-signal artifacts:
+
+- [Architecture](docs/architecture.md)
+- [ADR: governed prior-authorization slice](docs/adr/0001-governed-prior-authorization-slice.md)
+- [Model risk tiering](governance/model_risk_tiering.md)
+- [System card](governance/system_card.md)
+- [AI impact assessment](governance/ai_impact_assessment.md)
+- [Standards crosswalk](governance/standards_crosswalk.md)
+- [EU AI Act applicability reasoning](governance/eu_ai_act_applicability.md)
+- [FDA SaMD boundary reasoning](governance/fda_samd_boundary.md)
+- [Governance operating model](governance/governance_operating_model.md)
+- [Board risk report](governance/board_risk_report.md)
+- [Residual risk register](governance/residual_risk_register.md)
+- [Prior-auth walkthrough](examples/prior_authorization/governance_walkthrough.md)
+
+## Red-Team Eval
+
+Run the focused MVP red-team suite:
+
+```bash
+python scripts/run_redteam_eval.py
+```
+
+It checks prompt-injection and PHI-exfiltration cases without calling external LLM providers.
+
+Run unit tests:
+
+```bash
+python -m unittest discover -s tests
+```
+
+## Deployment Profile
+
+The repo is designed for Google ADK and a managed GCP agent runtime, but product names are intentionally contained in `deployment/gcp/` because Google Cloud agent services are evolving.
+
+MVP deployment artifacts:
+
+- `cloudbuild.yaml`
+- `deployment/gcp/managed_agent_runtime_profile.md`
+- `deployment/gcp/cloud_build_pipeline.md`
+- `deployment/gcp/agent_inventory_manifest.yaml`
+- `deployment/gcp/safety_screening_policy.yaml`
+
+Cloud Build is validation-only in the MVP. Live deployment, agent inventory registration, governed capability registration, and managed safety-screening integration are expansion items until implemented for real.
+
+## Standards Scope
+
+Core MVP mappings focus on:
+
+- NIST AI RMF
+- ISO/IEC 42001
+- SOC 2 Type 2
+- HIPAA
+- OWASP Top 10 for LLM Applications
+- EU AI Act applicability reasoning
+- FDA SaMD / GMLP boundary reasoning
+- FHIR provenance and interoperability considerations
+
+CMMC, NIST SP 800-171, and FedRAMP are explicitly out of scope unless a federal/CUI scenario is added.
+
+## Local Setup
+
+```bash
+pip install -r multi_model_agent/requirements.txt
+cp multi_model_agent/.env.example multi_model_agent/.env
 adk web
-4. Deploy to Vertex AI
-adk deploy agent_engine \
-  --project=YOUR_PROJECT \
-  --region=us-central1 \
-  --display_name="Multi-Model Agent" \
-  multi_model_agent
-☁️ Deployment
+```
 
-This agent runs on Vertex AI Agent Engine, providing:
-
-Managed infrastructure
-Session handling
-Observability + logging
-Scalable execution
-🧠 Design Philosophy
-Traditional Approach
-
-Pick the best model
-
-This System
-
-Design the best system of models
-
-🔮 Future Work
-Weighted ensemble scoring
-Automatic model routing
-Compile/test validation loops
-Skill-based context loading
-External execution (Cloud Run validation)
-⚠️ Security
-Do NOT expose API keys in .env in production
-Use GCP Secret Manager
-Avoid plaintext keys in Agent Engine UI
-🤝 Contributing
-
-Contributions and experiments are welcome.
+Set real provider keys only in local secrets or a managed secret store. Do not commit `.env`. The default model IDs are also shown in `multi_model_agent/.env.example` and can be overridden with environment variables.

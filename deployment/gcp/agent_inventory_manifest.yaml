@@ -1,0 +1,15 @@
+agent:
+  name: governed-multi-llm-prior-auth-assistant
+  owner: ai-architecture
+  risk_tier: high
+  data_classification: phi_pii_redacted
+  intended_use: prior_authorization_decision_support
+  prohibited_uses:
+    - autonomous_coverage_approval
+    - autonomous_coverage_denial
+    - diagnosis_or_treatment
+  evidence:
+    - governance/system_card.md
+    - governance/ai_impact_assessment.md
+    - evals/redteam/prior_auth_redteam_report.md
+  status: mvp_documentation_only

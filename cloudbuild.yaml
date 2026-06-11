@@ -1,0 +1,36 @@
+steps:
+  - name: python:3.11-slim
+    id: unit-tests
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        python -m pip install -r multi_model_agent/requirements.txt
+        python -m unittest discover -s tests
+
+  - name: python:3.11-slim
+    id: red-team-eval
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        python -m pip install -r multi_model_agent/requirements.txt
+        python scripts/run_redteam_eval.py
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: publish-evidence
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        if [ -n "$_EVIDENCE_BUCKET" ]; then
+          gcloud storage cp evals/redteam/prior_auth_redteam_report.md "$_EVIDENCE_BUCKET/multi-llm/$BUILD_ID/"
+        else
+          echo "No _EVIDENCE_BUCKET configured; skipping evidence upload."
+        fi
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _EVIDENCE_BUCKET: ""
