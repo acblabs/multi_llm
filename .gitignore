@@ -1,5 +1,8 @@
 .env
 .venv/
+.adk/
+.claude/
+*.db
 __pycache__/
 *.py[cod]
 .pytest_cache/
