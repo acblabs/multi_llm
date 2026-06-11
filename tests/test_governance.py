@@ -176,6 +176,16 @@ class GovernanceTests(unittest.TestCase):
         self.assertIn("[PATIENT_NAME]", request.contents[0].parts[0].text)
         self.assertEqual(request.contents[0].parts[1].inline_data.data, b"Patient: Jane Doe")
 
+    def test_phone_redaction_does_not_eat_bare_ten_digit_numbers(self):
+        result = redact_sensitive_data("Requesting Provider NPI 1356789012")
+        self.assertNotIn("[PHONE]", result.redacted_text)
+        self.assertIn("1356789012", result.redacted_text)
+
+    def test_formatted_phone_is_still_redacted(self):
+        result = redact_sensitive_data("Contact phone: (480) 555-0173")
+        self.assertIn("[PHONE]", result.redacted_text)
+        self.assertNotIn("0173", result.redacted_text)
+
     def test_policy_blocks_unredacted_sensitive_prompt(self):
         prompt = "Patient: Jane Doe. Member ID: ABC123456. Prior authorization."
         privacy = redact_sensitive_data(prompt)

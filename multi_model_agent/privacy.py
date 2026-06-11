@@ -12,7 +12,12 @@ SENSITIVE_PATTERNS: list[tuple[str, str, re.Pattern[str]]] = [
     (
         "phone",
         "[PHONE]",
-        re.compile(r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"),
+        # Require phone-style formatting (parentheses or separators) so bare
+        # 10-digit numbers (e.g., provider NPIs, account numbers) are not
+        # misclassified as phone numbers.
+        re.compile(
+            r"(?<!\d)(?:\+?1[-.\s])?(?:\(\d{3}\)[-.\s]?|\d{3}[-.\s])\d{3}[-.\s]\d{4}(?!\d)"
+        ),
     ),
     ("ssn", "[SSN]", re.compile(r"\b\d{3}-\d{2}-\d{4}\b")),
     (
