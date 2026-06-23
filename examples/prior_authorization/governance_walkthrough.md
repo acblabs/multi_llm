@@ -43,7 +43,7 @@ The report stores source references and hashes over redacted excerpts rather tha
 After a trace is present in a JSONL audit log, export a sanitized packet with:
 
 ```bash
-python scripts/export_audit_packet.py --trace-id TRACE_ID --audit-log audit_logs/dev_audit.jsonl
+python scripts/export_audit_packet.py --trace-id TRACE_ID --audit-log audit_logs/dev_audit.jsonl --output-dir .tmp_evidence_packet_check
 ```
 
 The packet includes sanitized audit events, audit-chain verification, terminal trace state, governance explanations, evidence coverage, redaction summary, model provenance, human review status, and a reviewer summary. Redaction totals are finding observations across audit events, not deduplicated per-request entity counts.

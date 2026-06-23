@@ -14,8 +14,11 @@ The MVP demonstrates a high-risk healthcare support workflow with controls for p
 | Gated redaction recall failures | Email, formatted phone, SSN, and member ID gates pass in `evals/privacy/redaction_benchmark_report.md` | 0 gated failures |
 | Known redaction limitations | Bare-name and bare-date recall reported as non-gated limitations | Managed sensitive-data inspection or improved detector before production |
 | Prior-auth structured invariance failures | Synthetic structured-status invariance cases pass in `evals/fairness/invariance_report.md` | Clinically reviewed fairness plan before production |
+| Evidence coverage boundary violations | Report generation and tests prohibit approval, denial, diagnosis, treatment, and medical-necessity language | Production policy review and output validators before operational use |
 | Audit trace coverage | Required for governed calls | 100% |
+| Audit chain verification | Sample chain verification is part of CI and scorecard generation | Every production log segment verified and externally anchored or stored immutably |
 | Reviewer evidence packet availability | `scripts/export_audit_packet.py` packages sanitized trace artifacts for a supplied trace ID | Automated packet generation for deployment review workflows |
+| Telemetry PHI attribute leakage | Optional telemetry uses allowlisted attributes and no-op/local test capture | Collector governance, retention limits, and platform content-capture controls |
 | Governance scorecard freshness | `governance/governance_scorecard.md` generated from deterministic reports and sample audit verification | CI-published scorecard for each reviewed change |
 | Provider fallback without audit event | 0 expected | 0 |
 
@@ -23,6 +26,9 @@ The MVP demonstrates a high-risk healthcare support workflow with controls for p
 
 - Whether external providers are permitted for PHI-adjacent workflows after redaction.
 - Whether managed sensitive-data inspection is mandatory before production.
+- Whether audit logs require external digest anchoring, protected signing/HMAC, object-store versioning, or immutable append-only storage.
+- Which evidence-packet retention, access-control, and incident-scrub process applies outside the demo.
+- Which telemetry collector, sampling, and retention controls are approved for production.
 - Which GCP managed agent runtime product name and status applies at implementation time.
 - Whether payer/provider legal review is required for each deployment context.
 

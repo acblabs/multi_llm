@@ -122,6 +122,19 @@ state. Durable metric events that are intentionally persisted through
 `observability.record_metric()` flow through the Phase 1 audit sanitizer and hash
 chain.
 
+## Correlation With Audit Evidence
+
+Telemetry spans are useful for runtime debugging and latency/cost inspection, but
+they are not the system of record. The durable evidence path is the sanitized
+audit chain plus exported evidence packets. Use the shared trace ID to correlate
+telemetry with audit events, and treat the audit event as authoritative when the
+two disagree.
+
+Production telemetry hardening should include collector access control,
+retention limits, sampling policy review, exporter credential management, and
+explicit disabling of any platform feature that captures prompts, responses,
+request bodies, raw exception payloads, or model message content.
+
 ## Test Capture
 
 Unit tests use in-memory capture rather than a collector:

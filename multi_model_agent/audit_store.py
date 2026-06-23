@@ -384,7 +384,7 @@ def verify_stored_events(
         event_count=event_count,
         errors=errors,
         final_hash=previous_hash,
-        path=path,
+        path=_portable_report_path(path),
     )
 
 
@@ -396,6 +396,12 @@ def _jsonl_lock_for_path(path: Path) -> RLock:
             lock = RLock()
             _JSONL_LOCKS[resolved_path] = lock
         return lock
+
+
+def _portable_report_path(path: str | None) -> str | None:
+    if path is None:
+        return None
+    return str(Path(path)).replace("\\", "/")
 
 
 def _build_stored_event(
@@ -630,6 +636,12 @@ def _sanitize_mapping(value: dict[str, Any]) -> dict[str, Any]:
             result["redaction_summary"] = summary
             continue
 
+        if normalized_key == "finding_counts_by_kind":
+            counts = _sanitize_finding_counts_by_kind(item)
+            if counts:
+                result["finding_counts_by_kind"] = counts
+            continue
+
         if isinstance(item, PrivacyAssessment):
             result["redaction_summary"] = item.redaction_summary()
             continue
@@ -822,6 +834,21 @@ def _redaction_summary_from_findings(
         "finding_counts_by_kind": dict(sorted(counts.items())),
         "contains_sensitive_data": contains_sensitive_data or total > 0,
     }
+
+
+def _sanitize_finding_counts_by_kind(value: Any) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+
+    counts: dict[str, int] = {}
+    for key, item in value.items():
+        safe_key = _redact_text_for_persistence(str(key))
+        if not _SAFE_IDENTIFIER_RE.fullmatch(safe_key):
+            continue
+        if isinstance(item, bool) or not isinstance(item, int) or item < 0:
+            continue
+        counts[safe_key] = item
+    return dict(sorted(counts.items()))
 
 
 def _finding_kind(finding: Any) -> str | None:

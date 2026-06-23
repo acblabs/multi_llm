@@ -178,6 +178,10 @@ class EvidencePacketTests(unittest.TestCase):
         packet_dir = Path(output["packet_dir"])
         self.assertTrue((packet_dir / "reviewer_summary.md").exists())
         self.assertTrue(output["audit_chain_verification"]["valid"])
+        self.assertNotIn("\\", output["packet_dir"])
+        self.assertNotIn("\\", output["audit_chain_verification"]["path"])
+        for file_path in output["files"].values():
+            self.assertNotIn("\\", file_path)
         for raw_value in RAW_VALUES:
             self.assertNotIn(raw_value, result.stdout)
 

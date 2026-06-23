@@ -55,8 +55,10 @@ class EvidencePacketExport:
     def to_dict(self) -> dict[str, Any]:
         return {
             "trace_id": self.trace_id,
-            "packet_dir": str(self.packet_dir),
-            "files": {name: str(path) for name, path in self.files.items()},
+            "packet_dir": _portable_report_path(self.packet_dir),
+            "files": {
+                name: _portable_report_path(path) for name, path in self.files.items()
+            },
             "audit_chain_verification": self.audit_chain_verification.model_dump(
                 mode="json"
             ),
@@ -182,6 +184,7 @@ def _write_packet(
     files["audit_events.jsonl"].write_text(
         "\n".join(packet["audit_events_jsonl"]) + "\n",
         encoding="utf-8",
+        newline="\n",
     )
     _write_json(
         files["audit_chain_verification.json"],
@@ -196,6 +199,7 @@ def _write_packet(
     files["reviewer_summary.md"].write_text(
         packet["reviewer_summary"],
         encoding="utf-8",
+        newline="\n",
     )
     return files
 
@@ -204,6 +208,7 @@ def _write_json(path: Path, value: Any) -> None:
     path.write_text(
         json.dumps(value, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
+        newline="\n",
     )
 
 
@@ -493,3 +498,7 @@ def read_text_for_scan(path: str | Path) -> str | None:
 def _safe_path_component(value: str) -> str:
     cleaned = _SAFE_PATH_COMPONENT_RE.sub("_", value).strip("._")
     return cleaned[:120] if cleaned else "trace"
+
+
+def _portable_report_path(path: str | Path) -> str:
+    return str(Path(path)).replace("\\", "/")

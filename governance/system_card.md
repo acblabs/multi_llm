@@ -44,6 +44,7 @@ For the LLM MVP, explainability is provided through:
 
 - provider attribution;
 - structured governance explanations with reason codes and policy IDs;
+- explicit exclusion of hidden Chain-of-Thought capture or logging;
 - risk classification rationale;
 - privacy redaction summaries without raw values;
 - policy decisions;
@@ -57,6 +58,16 @@ For the LLM MVP, explainability is provided through:
 
 SHAP, LIME, and counterfactual explanations are applicable to predictive/classical ML components if added later, but they are not claimed as implemented in this LLM-only MVP.
 
+## Auditability
+
+Audit events are sanitized before persistence and before hashing. The JSONL audit chain is integrity-verifiable: it can detect accidental payload edits, insertion, deletion, and reordering when verified with `scripts/verify_audit_chain.py`. It is not tamper-proof because a writer with filesystem access can rewrite the file and recompute the chain unless production storage adds protected signing/HMAC, immutable storage, append-only controls, object-store versioning, or external digest anchoring.
+
+Evidence packets exported with `scripts/export_audit_packet.py` are reviewer-ready bundles derived from sanitized audit events. They include chain verification, terminal trace state, governance explanations, evidence coverage, redaction summary, model provenance, human review status, and a reviewer summary.
+
+## Observability
+
+Optional OpenTelemetry governance spans and operational metrics are available through `multi_model_agent/telemetry.py`. Local and test mode remain no-op unless telemetry is enabled. Span and metric attributes are allowlisted and must not include prompts, responses, raw PHI, source excerpts, reviewer IDs, arbitrary exception messages, or hidden reasoning. Telemetry is operational evidence only; the sanitized audit chain remains the durable audit record.
+
 ## Human Oversight
 
-Prior-authorization requests require human review before operational use. The agent is decision support only.
+Prior-authorization requests require human review before operational use. The agent is decision support only. The MVP can record assignment and completion events, pseudonymize reviewer IDs with HMAC, sanitize review rationale, and derive terminal trace state from append-only audit events.

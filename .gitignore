@@ -13,3 +13,6 @@ build/
 *.egg-info/
 audit_logs/*
 !audit_logs/.gitkeep
+.tmp_evidence_packet_check/
+examples/evidence_packets/*
+!examples/evidence_packets/.gitkeep

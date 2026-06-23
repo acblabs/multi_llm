@@ -254,6 +254,8 @@ class AuditIntegrityTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
             self.assertIn('"valid": true', result.stdout)
+            output = json.loads(result.stdout)
+            self.assertNotIn("\\", output["path"])
 
 
 if __name__ == "__main__":

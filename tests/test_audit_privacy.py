@@ -213,6 +213,35 @@ class AuditPrivacyTests(unittest.TestCase):
         self.assertNotIn("prompt", serialized)
         self.assertNotIn("JANE DOE", serialized)
 
+    def test_redaction_summary_preserves_safe_counts_by_kind(self):
+        event = AuditEvent(
+            trace_id="trace-redaction-summary",
+            event_type="privacy_assessment",
+            details={
+                "redaction_summary": {
+                    "total_findings": 3,
+                    "contains_sensitive_data": True,
+                    "finding_counts_by_kind": {
+                        "email": 1,
+                        "member_id": 2,
+                        "patient Jane Doe": 99,
+                        "negative": -1,
+                    },
+                }
+            },
+        )
+
+        payload = sanitize_for_persistence(event)
+        summary = payload["details"]["redaction_summary"]
+
+        self.assertEqual(summary["total_findings"], 3)
+        self.assertTrue(summary["contains_sensitive_data"])
+        self.assertEqual(
+            summary["finding_counts_by_kind"],
+            {"email": 1, "member_id": 2},
+        )
+        self.assertNotIn("Jane Doe", json.dumps(payload))
+
     def test_privacy_safe_view_excludes_original_text_and_finding_values(self):
         privacy = redact_sensitive_data(PHI_TEXT)
 

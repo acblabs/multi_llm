@@ -61,6 +61,22 @@ The Responsible AI control plane runs in two places:
 
 The current MVP redaction, risk, and evidence coverage controls are deterministic heuristics. `privacy.py` is regex-based and does not cover all real-world PHI/PII forms, `risk.py` is lexical keyword matching rather than a semantic classifier, and `evidence_coverage.py` is not a payer-policy engine or medical-necessity model. Provider responses are currently plain text without enforced provider JSON mode, response schema, or output-side clinical-boundary validation.
 
+Structured explanations are governance records, not model Chain-of-Thought. They are populated from policy factors, reason codes, evidence coverage status, redaction summaries, provenance, and human-review state. Persistent artifacts must use safe views, sanitized audit payloads, and redacted excerpt hashes instead of raw prompts, raw responses, raw source excerpts, reviewer identities, or hidden reasoning.
+
+## Governance Artifact Lifecycle
+
+One governed request should produce a correlated artifact set:
+
+1. A trace ID is created or reused through `observability.ensure_trace_id`.
+2. Runtime governance objects may temporarily contain sensitive request data.
+3. Safe views are written to the audit sink through sanitize-on-write.
+4. The JSONL audit store hashes only sanitized payloads.
+5. `review.resolve_trace_state()` derives terminal review status by replaying sanitized events.
+6. `evidence_packet.py` exports reviewer-facing evidence from sanitized events.
+7. `generate_governance_scorecard.py` summarizes deterministic evals, sample audit verification, and CI-observed control status.
+
+This lifecycle is designed for defensible inspection. It is not a production retention, legal erasure, immutable logging, or clinical-decision workflow.
+
 ## Evaluation Plane
 
 The Phase 5 eval layer is intentionally deterministic so it can run in fast CI and local review without provider credentials:
@@ -73,7 +89,7 @@ These evals measure regression behavior for the MVP control plane. They do not p
 
 ## Evidence Packaging And CI
 
-`scripts/export_audit_packet.py --trace-id TRACE_ID --audit-log PATH` creates a reviewer packet under `examples/evidence_packets/` by default. The packet contains sanitized audit events, audit-chain verification, terminal trace state, governance explanations, evidence coverage, redaction summary, model provenance, human review status, and a markdown reviewer summary. Packet export uses the canonical stored trace ID, rebuilds the packet folder on each export, and derives trace state through the shared `review.replay_trace_state()` helper rather than replaying events separately.
+`scripts/export_audit_packet.py --trace-id TRACE_ID --audit-log PATH --output-dir .tmp_evidence_packet_check` creates a local reviewer packet in an ignored scratch directory. The packet contains sanitized audit events, audit-chain verification, terminal trace state, governance explanations, evidence coverage, redaction summary, model provenance, human review status, and a markdown reviewer summary. Packet export uses the canonical stored trace ID, rebuilds the packet folder on each export, and derives trace state through the shared `review.replay_trace_state()` helper rather than replaying events separately. CI may still export packets under `examples/evidence_packets/` as uploaded workflow artifacts; generated packet subfolders are ignored locally while `.gitkeep` keeps the directory present.
 
 Redaction totals in packets are finding observations summed across audit events. They are not deduplicated patient/entity counts because the audit log does not retain raw values or stable redaction span IDs. The packet exposes `source_event_count` and `counting_strategy` so reviewers can interpret the count correctly.
 

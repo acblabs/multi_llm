@@ -8,6 +8,42 @@ This is an architecture MVP, not a production medical or coverage-decision syste
 
 ## Architecture At A Glance
 
+```mermaid
+flowchart TD
+    U[User prompt] --> BAA
+    subgraph BAA[Managed GCP / ADK boundary]
+        ADK[ADK runtime and session state]
+        PR[before_model_callback PHI/PII redaction]
+        GEM[Gemini orchestrator]
+        ADK --> PR
+        PR -->|redacted model request| GEM
+    end
+    GEM --> G[Third-party egress control plane]
+    G --> R[Risk tiering]
+    G --> P[Defense-in-depth PHI/PII redaction]
+    G --> E[Approved-provider egress policy]
+    G --> EX[Structured governance explanations]
+    G --> EC[Prior-auth evidence coverage report]
+    G --> H[HITL escalation decision]
+    G --> A[Audit trace]
+    G --> EV[Deterministic governance evals]
+    G --> EP[Reviewer evidence packet]
+    EV --> SC[Governance scorecard]
+    EX --> A
+    EC --> A
+    EC --> H
+    A --> EP
+    E -->|redacted prompt only| O[OpenAI]
+    E -->|redacted prompt only| C[Claude]
+    E -->|redacted prompt only| X[Grok]
+    O --> GEM
+    C --> GEM
+    X --> GEM
+    GEM --> V[MVP boundary checks / planned output validation]
+    V --> A
+    V --> F[Final decision-support answer]
+```
+
 ```text
 User request
   -> pre-router PHI/PII redaction
@@ -100,6 +136,8 @@ The MVP governance path is implemented in code:
 
 The ADK agent uses `before_model_callback=redact_before_model`, which redacts text in the Gemini router request before the model call. External provider calls are then prepared through `prepare_provider_request()`, which redacts sensitive data again and records privacy, risk, policy, evidence coverage, and escalation events before egress to non-Google third-party LLMs.
 
+Structured governance explanations are deterministic control-plane artifacts. They use reason codes, policy IDs, decision factors, redaction counts, source references, and model provenance; they do not ask models to reveal hidden Chain-of-Thought and do not persist hidden reasoning.
+
 For prior-authorization workflows, `evidence_coverage.py` produces a deterministic `EvidenceCoverageReport` that labels required documentation elements as `present`, `missing`, `insufficient`, or `not_applicable`. The report stores source references and hashes over redacted excerpts, not raw excerpts. It is support for human review only; it must not approve care, deny coverage, determine medical necessity, diagnose, or recommend treatment.
 
 Human review is represented as an append-only lifecycle. High-risk prior-authorization requests emit `human_review_assigned`; reviewers can close the loop with `scripts/record_human_review.py`, which HMACs the raw reviewer ID with `MULTI_LLM_REVIEW_HMAC_KEY`, redacts the rationale, appends `human_review_completed`, and records `human_override_recorded` for modified, rejected, or escalated outcomes. `resolve_trace_state()` replays sanitized audit events to derive the terminal trace status.
@@ -112,7 +150,7 @@ python scripts/record_human_review.py --trace-id TRACE_ID --reviewer-id reviewer
 Reviewer-ready evidence packets can be exported for any trace present in a JSONL audit log:
 
 ```bash
-python scripts/export_audit_packet.py --trace-id TRACE_ID --audit-log audit_logs/dev_audit.jsonl
+python scripts/export_audit_packet.py --trace-id TRACE_ID --audit-log audit_logs/dev_audit.jsonl --output-dir .tmp_evidence_packet_check
 ```
 
 Each packet folder contains sanitized audit events, chain verification, terminal trace state, governance explanations, evidence coverage, redaction summary, model provenance, human review status, and a reviewer summary. Packet export rebuilds the trace folder on each run and uses the canonical stored trace ID in the packet contents.
@@ -203,6 +241,18 @@ Run unit tests:
 
 ```bash
 python -m unittest discover -s tests
+```
+
+Run the fast local governance evidence path:
+
+```bash
+python -m unittest discover -s tests
+python scripts/run_redteam_eval.py
+python evals/privacy/run_redaction_benchmark.py
+python evals/fairness/run_invariance_eval.py
+python scripts/verify_audit_chain.py examples/audit/sample_audit_chain.jsonl
+python scripts/export_audit_packet.py --trace-id sample-trace-001 --audit-log examples/audit/sample_audit_chain.jsonl --output-dir .tmp_evidence_packet_check
+python scripts/generate_governance_scorecard.py
 ```
 
 Generate the governance scorecard from local reports:

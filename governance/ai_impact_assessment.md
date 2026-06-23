@@ -31,8 +31,9 @@ The evidence coverage report is a structured documentation checklist. It identif
 | Demographic or identity sensitivity in prior-auth documentation triage | Synthetic prior-auth structured invariance regression comparing evidence statuses, human-review requirement, and prohibited decision boundaries |
 | Hallucinated or unsupported claims | Evidence coverage report, decision-support boundary, structured governance explanations, audit trace, and red-team hallucinated-evidence cases |
 | Unsafe fallback | `reliability.py` retry/fallback audit events |
-| Lack of accountability | RACI, residual risk register, board risk report |
+| Lack of accountability | HMAC-pseudonymized review closure, PHI-safe hash-chained audit trail, reviewer evidence packet, RACI, residual risk register, board risk report |
+| Misinterpretation of observability as audit evidence | `docs/observability.md` states telemetry is operational evidence only; durable evidence flows through sanitized audit events and evidence packets |
 
 ## Release Decision
 
-MVP status: architecture demonstration only. The deterministic evals provide regression evidence for the implemented control plane, but they do not establish production-grade PHI detection, production fairness, or adversarial robustness. Production use requires formal privacy review, security review, clinical operations approval, managed GCP boundary review, provider contracting/BAA review, and deployment evidence.
+MVP status: architecture demonstration only. The deterministic evals provide regression evidence for the implemented control plane, and the JSONL audit chain is integrity-verifiable, not tamper-proof. These artifacts do not establish production-grade PHI detection, production fairness, adversarial robustness, immutable audit retention, or clinical/payer decision readiness. Production use requires formal privacy review, security review, clinical operations approval, managed GCP boundary review, provider contracting/BAA review, telemetry and logging review, audit-retention design, and deployment evidence.

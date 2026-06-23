@@ -16,8 +16,8 @@
 
 ## Audit Chain
 
-- sample_audit_event_count: 1
-- sample_audit_final_hash: 9a5481a0ab65bc35c054b0262e1749bd875a5d0e0f79d7123e1022081b2d55bb
+- sample_audit_event_count: 9
+- sample_audit_final_hash: e2519df966eaaf1ebfdc513891f95adb5b7d6bfaca805941f9b32ec30274869b
 - sample_audit_errors: []
 - report_parse_errors: []
 
