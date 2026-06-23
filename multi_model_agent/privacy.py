@@ -42,7 +42,7 @@ SENSITIVE_PATTERNS: list[tuple[str, str, re.Pattern[str]]] = [
         "patient_name",
         "[PATIENT_NAME]",
         re.compile(
-            r"\b(?:patient|member)\s*(?:name)?\s*[:#-]\s*"
+            r"\b(?:patient|member)\s*(?:name)?\s*[:#-]?\s*"
             r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2}\b",
             re.IGNORECASE,
         ),
@@ -70,3 +70,7 @@ def redact_sensitive_data(text: str) -> PrivacyAssessment:
         findings=findings,
         contains_sensitive_data=bool(findings),
     )
+
+
+def safe_privacy_assessment(assessment: PrivacyAssessment) -> dict[str, object]:
+    return assessment.to_safe_dict()

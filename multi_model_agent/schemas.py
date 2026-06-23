@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -29,12 +29,32 @@ class PrivacyFinding(BaseModel):
     value: str
     replacement: str
 
+    def to_safe_dict(self) -> dict[str, str]:
+        return {
+            "kind": self.kind,
+            "replacement": self.replacement,
+        }
+
 
 class PrivacyAssessment(BaseModel):
     original_text: str
     redacted_text: str
     findings: list[PrivacyFinding] = Field(default_factory=list)
     contains_sensitive_data: bool = False
+
+    def redaction_summary(self) -> dict[str, Any]:
+        counts: dict[str, int] = {}
+        for finding in self.findings:
+            counts[finding.kind] = counts.get(finding.kind, 0) + 1
+
+        return {
+            "total_findings": len(self.findings),
+            "finding_counts_by_kind": dict(sorted(counts.items())),
+            "contains_sensitive_data": self.contains_sensitive_data,
+        }
+
+    def to_safe_dict(self) -> dict[str, Any]:
+        return {"redaction_summary": self.redaction_summary()}
 
 
 class RiskAssessment(BaseModel):
@@ -73,6 +93,26 @@ class AuditEvent(BaseModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
 
+class StoredAuditEvent(BaseModel):
+    schema_version: Literal["audit.v1"] = "audit.v1"
+    event_id: str = Field(default_factory=lambda: str(uuid4()))
+    timestamp: str
+    trace_id: str
+    event_type: str
+    payload: dict[str, Any]
+    payload_hash: str
+    previous_hash: str | None = None
+    event_hash: str
+
+
+class AuditVerificationResult(BaseModel):
+    valid: bool
+    event_count: int
+    errors: list[str] = Field(default_factory=list)
+    final_hash: str | None = None
+    path: str | None = None
+
+
 class GovernanceContext(BaseModel):
     trace_id: str = Field(default_factory=lambda: str(uuid4()))
     original_prompt: str
@@ -81,6 +121,17 @@ class GovernanceContext(BaseModel):
     risk: RiskAssessment
     escalation: EscalationDecision
     policy_decisions: list[PolicyDecision] = Field(default_factory=list)
+
+    def to_safe_dict(self) -> dict[str, Any]:
+        return {
+            "trace_id": self.trace_id,
+            "privacy": self.privacy.to_safe_dict(),
+            "risk": self.risk.model_dump(mode="json"),
+            "escalation": self.escalation.model_dump(mode="json"),
+            "policy_decisions": [
+                decision.model_dump(mode="json") for decision in self.policy_decisions
+            ],
+        }
 
 
 class ProviderRequest(BaseModel):

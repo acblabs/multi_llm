@@ -2,7 +2,7 @@
 
 Responsible AI control plane for a multi-LLM prior-authorization decision-support workflow.
 
-This repo demonstrates how to keep the core multi-LLM engineering story intact while adding the governance controls expected in regulated healthcare AI: pre-router PHI/PII redaction, risk tiering, defense-in-depth redaction before third-party egress, approved-provider egress policy, human-in-the-loop escalation, retry/fallback safety, schema validation, observability, and audit evidence.
+This repo demonstrates how to keep the core multi-LLM engineering story intact while adding the governance controls expected in regulated healthcare AI: pre-router PHI/PII redaction, risk tiering, defense-in-depth redaction before third-party egress, approved-provider egress policy, human-in-the-loop escalation, retry/fallback safety, schema contracts for governance artifacts, observability helpers, and audit evidence.
 
 This is an architecture MVP, not a production medical or coverage-decision system.
 
@@ -50,6 +50,8 @@ The agent still demonstrates modern AI orchestration:
 - retry with backoff, fallback chains, and graceful degradation;
 - token and cost tracking.
 
+The local usage summary in `metrics.py` is ephemeral demo telemetry, not audit evidence. Durable metric events should flow through `observability.record_metric()`, which writes sanitized audit events with a trace ID.
+
 Default model versions:
 
 | Role | Provider | LiteLLM model ID |
@@ -70,7 +72,7 @@ The MVP governance path is implemented in code:
 | PHI/PII redaction before third-party egress | `multi_model_agent/privacy.py` |
 | Provider egress policy | `multi_model_agent/policy.py` |
 | HITL escalation | `multi_model_agent/escalation.py` |
-| Audit trace | `multi_model_agent/audit.py` |
+| PHI-safe audit trace and hash-chain verification | `multi_model_agent/audit.py`, `multi_model_agent/audit_store.py`, `multi_model_agent/audit_hashing.py` |
 | Schema contracts | `multi_model_agent/schemas.py` |
 | Retry/fallback safety | `multi_model_agent/reliability.py` |
 | Provider tool integration | `multi_model_agent/tools.py` |
@@ -80,6 +82,30 @@ The ADK agent uses `before_model_callback=redact_before_model`, which redacts te
 Trust boundary note: the local ADK process receives user input, but no model should receive raw PHI/PII by default. The MVP redacts the ADK model request before the Gemini router call and redacts again before third-party provider calls. Raw PHI/PII may still exist in ADK session state/history or platform logs before callback redaction; production requires ingest-time redaction before session write and strict content-logging controls.
 
 MVP redaction is text-only and destructive. That is intentional for the prior-auth demo because the human reviewer retains the source document, but production may require stable pseudonymous tokens and managed inspection for files, images, and attachments.
+
+## Current MVP Limitations
+
+The current controls are intentionally deterministic and testable, but they are not production-grade clinical or coverage-decision controls:
+
+- `privacy.py` uses regular expressions and misses many real PHI forms, including unlabeled names, bare DOBs, international formats, context-free identifiers, homoglyphs, encoded/spaced values, and PII embedded in arbitrary JSON.
+- `risk.py` uses lexical keyword heuristics and can be bypassed by paraphrase or indirect phrasing.
+- Provider responses are plain text today. There is no enforced provider `response_format`, JSON schema, or post-response clinical-boundary validator on model outputs yet.
+- Runtime objects such as `GovernanceContext` and `PrivacyAssessment` may contain raw PHI during request processing. Safe views and audit persistence prevent those values from being written to durable artifacts, but production needs stricter runtime data-minimization and logging controls.
+- The deterministic red-team suite is still small and should be expanded before claiming broad adversarial robustness.
+
+## PHI-Safe Audit Chain
+
+Audit events are sanitized before persistence and before hashing. The persistence allowlist favors structured fields such as provider, action, risk tier, reason codes, policy IDs, model provenance, redaction summaries, token counts, and safe error categories. Generic free-text fields such as raw reasons, names, arbitrary values, prompts, responses, excerpts, and reviewer IDs are not persisted.
+
+The default local sink writes JSONL to `audit_logs/dev_audit.jsonl`; tests can swap in an in-memory adapter through the audit facade. Verify a local log with:
+
+```bash
+python scripts/verify_audit_chain.py audit_logs/dev_audit.jsonl
+```
+
+The JSONL hash chain is integrity-verifiable, not tamper-proof. It detects accidental edits, event reordering, middle deletion, and insertion when the verifier checks the chain links and hashes. A process-local thread lock protects demo appends; multi-process writers need a file lock, database, append-only object store, or external audit service. Appending reloads and verifies the existing chain, which is simple and defensible for this MVP but O(n) per write. A partial final-line write from a crash requires manual log rotation or recovery before appends resume. A user with filesystem write access could still rewrite the whole file and recompute hashes unless production storage adds protected HMAC/signing keys, immutable storage, object-store versioning, append-only controls, or external digest anchoring.
+
+If raw PHI is accidentally persisted, rotate the affected log, preserve any restricted incident copy only as policy requires, write a documented scrub event to a new log, and accept the chain break rather than silently rewriting history.
 
 ## Evidence
 
@@ -113,6 +139,16 @@ Run unit tests:
 ```bash
 python -m unittest discover -s tests
 ```
+
+## Optional Git Hooks
+
+This repo includes opt-in hooks for local guardrails:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+The pre-commit hook blocks generated audit logs by path and by parsing staged JSON/JSONL for `audit.v1` stored events, then runs compile checks. The pre-push hook runs unit tests and the deterministic red-team eval. Set `PYTHON=/path/to/python` before invoking Git if your shell does not expose `python` on `PATH`. These hooks are useful local tripwires, but CI should remain the source of record for required governance checks.
 
 ## Deployment Profile
 

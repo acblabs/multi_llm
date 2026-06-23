@@ -4,7 +4,8 @@ from unittest.mock import patch
 from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
-from multi_model_agent.audit import clear_audit_log, get_audit_log
+from multi_model_agent.audit import clear_audit_log, get_audit_log, set_audit_store
+from multi_model_agent.audit_store import InMemoryAuditStore
 from multi_model_agent.governance import GovernanceBlockedError, prepare_provider_request
 from multi_model_agent.agent import root_agent
 from multi_model_agent.policy import evaluate_provider_access
@@ -37,6 +38,7 @@ class _FakeContext:
 
 class GovernanceTests(unittest.TestCase):
     def setUp(self):
+        set_audit_store(InMemoryAuditStore())
         clear_audit_log()
 
     def test_phi_is_redacted_before_provider_egress(self):

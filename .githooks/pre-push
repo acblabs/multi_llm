@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+set -eu
+
+PYTHON_BIN="${PYTHON:-python}"
+
+"$PYTHON_BIN" -m unittest discover -s tests
+"$PYTHON_BIN" scripts/run_redteam_eval.py
