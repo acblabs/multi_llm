@@ -22,6 +22,7 @@ from .schemas import (
     AuditEvent,
     AuditVerificationResult,
     DecisionFactor,
+    EvidenceCoverageReport,
     GovernanceDecisionExplanation,
     GovernanceContext,
     PrivacyAssessment,
@@ -182,6 +183,8 @@ def safe_audit_details(details: Any) -> dict[str, Any]:
         return details.to_safe_dict()
     if isinstance(details, GovernanceDecisionExplanation):
         return {"governance_explanation": _safe_governance_explanation(details)}
+    if isinstance(details, EvidenceCoverageReport):
+        return {"evidence_coverage_report": _safe_evidence_coverage_report(details)}
     if isinstance(details, GovernanceContext):
         return _sanitize_mapping(details.to_safe_dict())
     safe = _sanitize_mapping(details if isinstance(details, dict) else {"value": details})
@@ -547,6 +550,20 @@ def _safe_decision_factor(value: Any) -> dict[str, Any]:
     return factor.to_safe_dict()
 
 
+def _safe_evidence_coverage_report(value: Any) -> dict[str, Any]:
+    if isinstance(value, EvidenceCoverageReport):
+        report = value
+    elif isinstance(value, dict):
+        try:
+            report = EvidenceCoverageReport.model_validate(value)
+        except Exception:
+            return {}
+    else:
+        return {}
+
+    return report.to_safe_dict()
+
+
 def _safe_identifier(value: str, *, label: str) -> str:
     if _SAFE_IDENTIFIER_RE.fullmatch(value):
         return value
@@ -602,6 +619,12 @@ def _sanitize_mapping(value: dict[str, Any]) -> dict[str, Any]:
                 result["governance_explanations"] = safe_explanations
             continue
 
+        if normalized_key == "evidence_coverage_report":
+            safe_report = _safe_evidence_coverage_report(item)
+            if safe_report:
+                result["evidence_coverage_report"] = safe_report
+            continue
+
         if normalized_key == "token_counts":
             safe_token_counts = _sanitize_token_counts(item)
             if safe_token_counts:
@@ -637,6 +660,8 @@ def _sanitize_value(value: Any) -> Any:
         return _safe_governance_explanation(value)
     if isinstance(value, DecisionFactor):
         return _safe_decision_factor(value)
+    if isinstance(value, EvidenceCoverageReport):
+        return _safe_evidence_coverage_report(value)
     if isinstance(value, GovernanceContext):
         return _sanitize_mapping(value.to_safe_dict())
     if isinstance(value, BaseModel):

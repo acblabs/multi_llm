@@ -1,0 +1,86 @@
+{
+  "trace_id": "trace-sample-prior-auth",
+  "workflow_type": "prior_authorization",
+  "items": [
+    {
+      "requirement_id": "diagnosis_condition",
+      "requirement_name": "Diagnosis or condition",
+      "status": "present",
+      "source_reference": {
+        "document_name": "clinical_notes.pdf",
+        "page": 2,
+        "section": "assessment"
+      },
+      "source_excerpt_hash": "0b3f1a43f7bb6450a18041fdadbc6f2fd3c1d4e280af30f0f4de03f1da7c5a11",
+      "rationale": "Documentation contains a diagnosis or condition signal for reviewer verification."
+    },
+    {
+      "requirement_id": "requested_service",
+      "requirement_name": "Requested service or procedure",
+      "status": "present",
+      "source_reference": {
+        "document_name": "order.pdf",
+        "page": 1,
+        "section": "request"
+      },
+      "source_excerpt_hash": "ecdb0c81173c4c5810281ad9fbd985b735722d72e4e3f7f2839240521a1cbd46",
+      "rationale": "Documentation contains a requested service or procedure signal for reviewer verification."
+    },
+    {
+      "requirement_id": "clinical_rationale",
+      "requirement_name": "Clinical rationale",
+      "status": "present",
+      "source_excerpt_hash": "f1da487efb8f126477b7d9e4c370d78a7eb4690b64a929763f95df7861967b72",
+      "rationale": "Documentation contains a clinical rationale signal for reviewer verification."
+    },
+    {
+      "requirement_id": "relevant_history",
+      "requirement_name": "Relevant history",
+      "status": "present",
+      "source_excerpt_hash": "bb4928f324a9b1a581aa4af817ff3208ad6950f8e1d14594a2d0b03201d20c9a",
+      "rationale": "Documentation contains a relevant history signal for reviewer verification."
+    },
+    {
+      "requirement_id": "prior_conservative_therapy",
+      "requirement_name": "Prior conservative therapy",
+      "status": "insufficient",
+      "source_excerpt_hash": "8f73dbd1ba9ffac1c97e7cad279704488f3e998c705bd51871f9856e6228d977",
+      "rationale": "Documentation mentions prior conservative therapy but leaves detail incomplete for reviewer verification."
+    },
+    {
+      "requirement_id": "imaging_or_lab_documentation",
+      "requirement_name": "Imaging or lab documentation",
+      "status": "missing",
+      "rationale": "Documentation does not include a clear imaging or lab documentation element."
+    },
+    {
+      "requirement_id": "medication_history",
+      "requirement_name": "Medication history",
+      "status": "present",
+      "source_excerpt_hash": "0b4376ce73aa93bc1077c9a9b1cc2327b4279f9bfd54977ee0367c55218e2083",
+      "rationale": "Documentation contains a medication history signal for reviewer verification."
+    },
+    {
+      "requirement_id": "provider_notes",
+      "requirement_name": "Provider notes",
+      "status": "present",
+      "source_excerpt_hash": "3d293e51574648bb4d10ffedfc26f2ec5d8cb4f3197d9469e5f0d58aa7fe9f65",
+      "rationale": "Documentation contains a provider notes signal for reviewer verification."
+    },
+    {
+      "requirement_id": "payer_policy_references",
+      "requirement_name": "Payer policy references",
+      "status": "not_applicable",
+      "rationale": "Payer policy references was not indicated as relevant by the supplied documentation."
+    }
+  ],
+  "overall_summary": "Evidence coverage found 6 present, 1 insufficient, 1 missing, and 1 not applicable documentation elements. Human review remains required. This report is documentation support only.",
+  "human_review_required": true,
+  "prohibited_decision_boundary": [
+    "coverage_approval",
+    "coverage_denial",
+    "medical_necessity_determination",
+    "diagnosis_decision",
+    "treatment_recommendation"
+  ]
+}

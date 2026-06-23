@@ -13,10 +13,28 @@ Summarize this prior authorization request for medication coverage and identify 
 2. `risk.py` classifies the workflow as high risk because it is prior-authorization support.
 3. `privacy.py` redacts again before third-party provider egress.
 4. `policy.py` allows only the redacted prompt to leave the managed GCP/ADK boundary for non-Google third-party providers.
-5. `escalation.py` requires human review.
-6. `tools.py` sends the redacted prompt to approved third-party providers with retry/fallback.
-7. `audit.py` records privacy, risk, policy, escalation, provider, and metric events.
+5. `explainer.py` attaches deterministic reason codes, policy IDs, and safe reviewer-facing rationales to governance decisions.
+6. `evidence_coverage.py` produces an `EvidenceCoverageReport` for prior authorization documentation.
+7. `escalation.py` requires human review.
+8. `tools.py` sends the redacted prompt to approved third-party providers with retry/fallback.
+9. `audit.py` records privacy, risk, policy, evidence coverage, escalation, provider, and metric events.
+
+## Evidence Coverage Output
+
+The evidence coverage report identifies documentation elements as `present`, `missing`, `insufficient`, or `not_applicable`:
+
+- diagnosis or condition;
+- requested service or procedure;
+- clinical rationale;
+- relevant history;
+- prior conservative therapy;
+- imaging or lab documentation;
+- medication history, when relevant;
+- provider notes;
+- payer policy references, when supplied.
+
+The report stores source references and hashes over redacted excerpts rather than raw source excerpts. See `evidence_coverage_sample.json` for a sanitized example.
 
 ## Expected Boundary
 
-The agent may summarize and organize facts. It must not approve or deny coverage, determine medical necessity, or bypass human review.
+The agent may summarize and organize facts and identify missing or insufficient documentation for human review. It must not approve or deny coverage, determine medical necessity, diagnose, recommend treatment, or bypass human review.

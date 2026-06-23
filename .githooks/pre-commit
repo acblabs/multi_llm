@@ -4,4 +4,5 @@ set -eu
 PYTHON_BIN="${PYTHON:-python}"
 
 "$PYTHON_BIN" scripts/check_staged_audit_logs.py
+"$PYTHON_BIN" scripts/check_staged_docs.py
 "$PYTHON_BIN" -m compileall multi_model_agent scripts tests

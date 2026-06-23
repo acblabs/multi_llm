@@ -51,6 +51,9 @@ _SCHEMA_PATIENT_NAME_RE = re.compile(
     re.IGNORECASE,
 )
 _SCHEMA_BARE_DATE_RE = re.compile(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b")
+_SCHEMA_REFERENCE_PERSON_RE = re.compile(
+    r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2}\b"
+)
 
 
 class PrivacyFinding(BaseModel):
@@ -149,6 +152,87 @@ class GovernanceDecisionExplanation(BaseModel):
         }
 
 
+class SourceReference(BaseModel):
+    document_name: str | None = None
+    page: int | None = None
+    section: str | None = None
+    locator: str | None = None
+
+    def to_safe_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        if self.document_name:
+            result["document_name"] = _safe_schema_reference_text(
+                self.document_name,
+                label="document",
+            )
+        if self.page is not None and self.page > 0:
+            result["page"] = self.page
+        if self.section:
+            result["section"] = _safe_schema_reference_text(
+                self.section,
+                label="section",
+            )
+        if self.locator:
+            result["locator"] = _safe_schema_reference_text(
+                self.locator,
+                label="locator",
+            )
+        return result
+
+
+class EvidenceCoverageItem(BaseModel):
+    requirement_id: str
+    requirement_name: str
+    status: Literal["present", "missing", "insufficient", "not_applicable"]
+    source_reference: SourceReference | None = None
+    source_excerpt_hash: str | None = None
+    rationale: str
+
+    def to_safe_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "requirement_id": _safe_schema_identifier(
+                self.requirement_id,
+                label="requirement",
+            ),
+            "requirement_name": _redact_schema_text(self.requirement_name),
+            "status": self.status,
+            "rationale": _redact_schema_text(self.rationale),
+        }
+        if self.source_reference is not None:
+            result["source_reference"] = self.source_reference.to_safe_dict()
+        if self.source_excerpt_hash:
+            result["source_excerpt_hash"] = _safe_schema_identifier(
+                self.source_excerpt_hash,
+                label="excerpt_hash",
+            )
+        return result
+
+
+class EvidenceCoverageReport(BaseModel):
+    trace_id: str
+    workflow_type: str = "prior_authorization"
+    items: list[EvidenceCoverageItem]
+    overall_summary: str
+    human_review_required: bool
+    prohibited_decision_boundary: list[str]
+
+    def to_safe_dict(self) -> dict[str, Any]:
+        return {
+            "trace_id": _safe_schema_identifier(self.trace_id, label="trace"),
+            "workflow_type": _safe_schema_identifier(
+                self.workflow_type,
+                label="workflow",
+            ),
+            "items": [item.to_safe_dict() for item in self.items],
+            "overall_summary": _redact_schema_text(self.overall_summary),
+            "human_review_required": self.human_review_required,
+            "prohibited_decision_boundary": [
+                _safe_schema_identifier(boundary, label="boundary")
+                for boundary in self.prohibited_decision_boundary
+            ],
+        }
+
+
 class RiskAssessment(BaseModel):
     risk_tier: RiskTier
     use_case: str
@@ -239,9 +323,10 @@ class GovernanceContext(BaseModel):
     escalation: EscalationDecision
     policy_decisions: list[PolicyDecision] = Field(default_factory=list)
     explanations: list[GovernanceDecisionExplanation] = Field(default_factory=list)
+    evidence_coverage_report: EvidenceCoverageReport | None = None
 
     def to_safe_dict(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "trace_id": self.trace_id,
             "privacy": self.privacy.to_safe_dict(),
             "risk": self.risk.to_safe_dict(),
@@ -253,6 +338,11 @@ class GovernanceContext(BaseModel):
                 explanation.to_safe_dict() for explanation in self.explanations
             ],
         }
+        if self.evidence_coverage_report is not None:
+            result["evidence_coverage_report"] = (
+                self.evidence_coverage_report.to_safe_dict()
+            )
+        return result
 
 
 class ProviderRequest(BaseModel):
@@ -318,3 +408,19 @@ def _redact_schema_text(value: str) -> str:
     redacted = _SCHEMA_MEMBER_ID_RE.sub("[MEMBER_ID]", redacted)
     redacted = _SCHEMA_PATIENT_NAME_RE.sub("[PATIENT_NAME]", redacted)
     return _SCHEMA_BARE_DATE_RE.sub("[DATE]", redacted)
+
+
+def _safe_schema_reference_text(value: str, *, label: str) -> str:
+    redacted = _redact_schema_text(value)
+    if redacted != value:
+        digest = sha256(value.encode("utf-8")).hexdigest()[:16]
+        return f"{label}:{digest}"
+    if _SCHEMA_REFERENCE_PERSON_RE.search(value):
+        digest = sha256(value.encode("utf-8")).hexdigest()[:16]
+        return f"{label}:{digest}"
+    if _SAFE_SCHEMA_IDENTIFIER_RE.fullmatch(value):
+        return value
+    if re.fullmatch(r"[A-Za-z0-9_.:/# -]{1,200}", value):
+        return value
+    digest = sha256(value.encode("utf-8")).hexdigest()[:16]
+    return f"{label}:{digest}"

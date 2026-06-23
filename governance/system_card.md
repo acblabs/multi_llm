@@ -6,7 +6,7 @@ Governed Multi-LLM Prior-Authorization Assistant
 
 ## Summary
 
-This system demonstrates how a multi-LLM agent can be governed with pre-router PHI/PII redaction, risk tiering, defense-in-depth redaction before third-party egress, approved-provider egress policy, human escalation, retry/fallback controls, schema validation, and audit logging.
+This system demonstrates how a multi-LLM agent can be governed with pre-router PHI/PII redaction, risk tiering, defense-in-depth redaction before third-party egress, approved-provider egress policy, structured governance explanations, prior-auth evidence coverage reporting, human escalation, retry/fallback controls, schema validation, and PHI-safe audit logging.
 
 ## Intended Users
 
@@ -23,6 +23,7 @@ Summarize prior-authorization documentation and identify missing administrative 
 
 - Does not make final coverage decisions.
 - Does not determine medical necessity.
+- Evidence coverage reports organize documentation status for human review; they are not approval, denial, diagnosis, treatment, or medical-necessity outputs.
 - Does not replace clinical or payer review.
 - Uses heuristic PHI/PII redaction in the MVP; production requires managed sensitive-data inspection and validation.
 - External provider calls use verified LiteLLM model IDs: `gemini-3.5-flash`, `gpt-5.5`, `claude-opus-4-8`, and `xai/grok-4.3`.
@@ -37,11 +38,13 @@ Summarize prior-authorization documentation and identify missing administrative 
 For the LLM MVP, explainability is provided through:
 
 - provider attribution;
+- structured governance explanations with reason codes and policy IDs;
 - risk classification rationale;
-- privacy findings;
+- privacy redaction summaries without raw values;
 - policy decisions;
+- prior-auth evidence coverage status, source references, and hashes over redacted excerpts;
 - HITL escalation decisions;
-- a single audit trace ID that correlates the pre-router redaction, risk classification, policy decision, HITL escalation, and provider-call events for one request (propagated through ADK session state and tool context).
+- a single audit trace ID that correlates the pre-router redaction, risk classification, policy decision, evidence coverage, HITL escalation, and provider-call events for one request (propagated through ADK session state and tool context).
 
 SHAP, LIME, and counterfactual explanations are applicable to predictive/classical ML components if added later, but they are not claimed as implemented in this LLM-only MVP.
 

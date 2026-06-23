@@ -1,5 +1,6 @@
 from .audit import append_audit_event
 from .escalation import assess_human_escalation
+from .evidence_coverage import generate_evidence_coverage_report
 from .explainer import (
     collect_governance_explanations,
     explain_fallback_decision,
@@ -12,6 +13,7 @@ from .risk import classify_request
 from .schemas import (
     GovernanceContext,
     GovernanceDecisionExplanation,
+    EvidenceCoverageReport,
     PolicyAction,
     PolicyDecision,
     ProviderRequest,
@@ -55,6 +57,12 @@ def prepare_provider_request(
         policy_decision=decision,
         escalation=escalation,
     )
+    evidence_coverage_report = _build_evidence_coverage_report(
+        trace_id=trace,
+        governed_prompt=governed_prompt,
+        workflow_type=risk.use_case,
+        human_review_required=escalation.required,
+    )
     context = GovernanceContext(
         trace_id=trace,
         original_prompt=prompt,
@@ -64,6 +72,7 @@ def prepare_provider_request(
         escalation=escalation,
         policy_decisions=[decision],
         explanations=explanations,
+        evidence_coverage_report=evidence_coverage_report,
     )
 
     _record_governance_events(context, decision)
@@ -238,9 +247,44 @@ def _record_governance_events(
             "governance_explanation": safe_hitl_explanation,
         },
     )
+    if context.evidence_coverage_report is not None:
+        append_audit_event(
+            trace_id=context.trace_id,
+            event_type="evidence_coverage_report",
+            action="generated",
+            risk_tier=context.risk.risk_tier,
+            details={
+                "evidence_coverage_report": (
+                    context.evidence_coverage_report.to_safe_dict()
+                ),
+                "human_review_required": context.escalation.required,
+                "policy_ids": ["prior_auth_evidence_coverage_support_boundary"],
+                "reason_codes": [
+                    "PRIOR_AUTH_EVIDENCE_COVERAGE_GENERATED",
+                    "DECISION_SUPPORT_ONLY",
+                ],
+            },
+        )
 
 
 def _safe_explanation_dict(
     explanation: GovernanceDecisionExplanation | None,
 ) -> dict[str, object] | None:
     return explanation.to_safe_dict() if explanation is not None else None
+
+
+def _build_evidence_coverage_report(
+    *,
+    trace_id: str,
+    governed_prompt: str,
+    workflow_type: str,
+    human_review_required: bool,
+) -> EvidenceCoverageReport | None:
+    if workflow_type != "prior_authorization":
+        return None
+    return generate_evidence_coverage_report(
+        trace_id=trace_id,
+        text=governed_prompt,
+        workflow_type=workflow_type,
+        human_review_required=human_review_required,
+    )

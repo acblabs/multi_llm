@@ -4,6 +4,10 @@ from scripts.check_staged_audit_logs import (
     blocked_staged_audit_artifacts,
     looks_like_audit_log_content,
 )
+from scripts.check_staged_docs import (
+    REQUIRED_GOVERNANCE_DOCS,
+    missing_required_docs_for_staged_changes,
+)
 
 
 class GitHookGuardTests(unittest.TestCase):
@@ -65,6 +69,30 @@ class GitHookGuardTests(unittest.TestCase):
         blocked = blocked_staged_audit_artifacts(["audit_logs/custom.jsonl"])
 
         self.assertEqual(blocked, [("audit_logs/custom.jsonl", "default audit log path")])
+
+    def test_governance_code_changes_require_a_documentation_update(self):
+        missing = missing_required_docs_for_staged_changes(
+            ["multi_model_agent/evidence_coverage.py"]
+        )
+
+        self.assertEqual(missing, list(REQUIRED_GOVERNANCE_DOCS))
+
+    def test_governance_code_changes_pass_when_one_reviewer_doc_is_staged(self):
+        missing = missing_required_docs_for_staged_changes(
+            ["multi_model_agent/evidence_coverage.py", "docs/architecture.md"]
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_test_only_commits_do_not_require_documentation_updates(self):
+        missing = missing_required_docs_for_staged_changes(["tests/test_githooks.py"])
+
+        self.assertEqual(missing, [])
+
+    def test_docs_only_commits_do_not_require_every_governance_doc(self):
+        missing = missing_required_docs_for_staged_changes(["README.md"])
+
+        self.assertEqual(missing, [])
 
 
 if __name__ == "__main__":

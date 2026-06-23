@@ -16,9 +16,11 @@ Build one prior-authorization vertical slice before expanding horizontally:
 2. Redact PHI/PII.
 3. Enforce provider egress policy.
 4. Preserve retry/fallback.
-5. Require HITL for high-risk workflows.
-6. Emit audit events.
-7. Produce a red-team eval report.
+5. Produce structured governance explanations.
+6. Produce a prior-auth evidence coverage report for human review.
+7. Require HITL for high-risk workflows.
+8. Emit PHI-safe audit events with integrity verification.
+9. Produce a red-team eval report.
 
 ## Consequences
 

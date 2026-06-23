@@ -4,6 +4,8 @@
 
 The MVP supports prior-authorization summarization and documentation review. It is intended to help a human reviewer organize facts, identify missing materials, and prepare a draft summary.
 
+The evidence coverage report is a structured documentation checklist. It identifies supplied, missing, insufficient, or not-applicable documentation elements for human review, but it does not decide coverage, medical necessity, diagnosis, or treatment.
+
 ## Out-Of-Scope Uses
 
 - Final coverage approval or denial.
@@ -25,7 +27,7 @@ The MVP supports prior-authorization summarization and documentation review. It 
 | PHI/PII leakage to model providers | `pre_router.py` redaction before Gemini plus `privacy.py` redaction and `policy.py` egress block before third-party providers |
 | Automation bias | HITL escalation and system-card limitations |
 | Prompt injection | Red-team eval and safety-screening deployment profile |
-| Hallucinated or unsupported claims | Multi-LLM synthesis boundary and audit trace |
+| Hallucinated or unsupported claims | Evidence coverage report, decision-support boundary, structured governance explanations, and audit trace |
 | Unsafe fallback | `reliability.py` retry/fallback audit events |
 | Lack of accountability | RACI, residual risk register, board risk report |
 
