@@ -59,6 +59,8 @@ The agent still demonstrates modern AI orchestration:
 
 The local usage summary in `metrics.py` is ephemeral demo telemetry, not audit evidence. Durable metric events should flow through `observability.record_metric()`, which writes sanitized audit events with a trace ID.
 
+Optional OpenTelemetry spans and operational metrics live behind `multi_model_agent/telemetry.py`. Local/dev mode remains no-op unless enabled by environment variables; prompts, responses, raw PHI, raw excerpts, and reviewer IDs are never attached as telemetry attributes.
+
 Default model versions:
 
 | Role | Provider | LiteLLM model ID |
@@ -85,6 +87,7 @@ The MVP governance path is implemented in code:
 | Schema contracts | `multi_model_agent/schemas.py` |
 | Retry/fallback safety | `multi_model_agent/reliability.py` |
 | Provider tool integration | `multi_model_agent/tools.py` |
+| Optional OpenTelemetry governance observability | `multi_model_agent/telemetry.py`, `docs/observability.md` |
 | Deterministic red-team eval | `scripts/run_redteam_eval.py`, `evals/redteam/prior_auth_redteam_cases.json` |
 | Privacy redaction benchmark | `evals/privacy/run_redaction_benchmark.py`, `evals/privacy/labeled_phi_cases.jsonl` |
 | Prior-auth structured invariance regression | `evals/fairness/run_invariance_eval.py`, `evals/fairness/prior_auth_invariance_cases.jsonl` |
@@ -136,6 +139,7 @@ If raw PHI is accidentally persisted, rotate the affected log, preserve any rest
 High-signal artifacts:
 
 - [Architecture](docs/architecture.md)
+- [Observability](docs/observability.md)
 - [ADR: governed prior-authorization slice](docs/adr/0001-governed-prior-authorization-slice.md)
 - [Model risk tiering](governance/model_risk_tiering.md)
 - [System card](governance/system_card.md)

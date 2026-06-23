@@ -5,6 +5,7 @@ from typing import TypeVar
 
 from .audit import append_audit_event
 from .explainer import explain_retry_decision
+from .telemetry import METRIC_RETRY_COUNT, record_governance_metric
 
 
 T = TypeVar("T")
@@ -39,6 +40,16 @@ def retry_with_backoff(
             return func()
         except Exception as error:
             error_type = classify_error(error)
+            if error_type == "retry":
+                record_governance_metric(
+                    METRIC_RETRY_COUNT,
+                    1,
+                    {
+                        "governance.trace_id": trace_id,
+                        "governance.provider": provider,
+                        "governance.retry_count": attempt + 1,
+                    },
+                )
             explanation = explain_retry_decision(
                 trace_id=trace_id,
                 provider=provider,

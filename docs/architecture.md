@@ -65,6 +65,12 @@ The Phase 5 eval layer is intentionally deterministic so it can run in fast CI a
 
 These evals measure regression behavior for the MVP control plane. They do not prove production-grade PHI detection, production fairness, or broad adversarial robustness.
 
+## Observability Plane
+
+`multi_model_agent/telemetry.py` provides optional OpenTelemetry governance spans and operational metrics without making OpenTelemetry a hard runtime dependency. Default local/dev mode is no-op, and tests can enable deterministic in-memory capture without a collector. When enabled, spans cover redaction, risk classification, policy egress checks, provider calls, HITL escalation, output boundary validation, and an ADK-managed Gemini synthesis handoff marker.
+
+Telemetry attributes use a strict allowlist and sanitizer. They can include trace IDs, risk tier, policy IDs, redaction counts, provider/model identifiers, token counts, fallback/retry state, and estimated cost. They must not include prompts, responses, raw PHI, source excerpts, reviewer IDs, arbitrary exception messages, or hidden reasoning. Operational telemetry is not audit evidence unless the event is explicitly persisted through the sanitized audit sink.
+
 ## Traceability
 
 A single trace ID correlates every governance event for one request. The `before_model_callback` stores a trace ID in ADK session state on the first model call (`observability.ensure_trace_id`), and the provider tools reuse it through their injected `tool_context`. As a result, the pre-router redaction event, risk classification, policy decision, structured explanation, evidence coverage report, HITL escalation, and each provider call/outcome for one invocation share the same trace ID in the audit log and can be retrieved together with `get_audit_log(trace_id)`.

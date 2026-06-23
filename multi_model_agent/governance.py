@@ -1,4 +1,5 @@
 from .audit import append_audit_event
+from .config import MODEL_CONFIG, PRICING
 from .escalation import assess_human_escalation
 from .evidence_coverage import generate_evidence_coverage_report
 from .explainer import (
@@ -20,6 +21,20 @@ from .schemas import (
     ProviderRequest,
     RiskTier,
 )
+from .telemetry import (
+    METRIC_ERROR_COUNT,
+    METRIC_ESTIMATED_COST_USD,
+    METRIC_HUMAN_ESCALATIONS_TOTAL,
+    METRIC_POLICY_VIOLATION_ATTEMPTS,
+    METRIC_REQUEST_COUNT,
+    METRIC_RISK_TIER_DISTRIBUTION,
+    SPAN_ESCALATION_HITL,
+    SPAN_OUTPUT_SCHEMA_VALIDATION,
+    SPAN_POLICY_EGRESS_CHECK,
+    SPAN_RISK_CLASSIFICATION,
+    governance_span,
+    record_governance_metric,
+)
 
 
 class GovernanceBlockedError(Exception):
@@ -38,19 +53,79 @@ def prepare_provider_request(
 ) -> tuple[ProviderRequest, GovernanceContext, PolicyDecision]:
     trace = trace_id or new_trace_id()
     privacy = redact_sensitive_data(prompt)
-    risk = classify_request(
-        prompt,
-        contains_sensitive_data=privacy.contains_sensitive_data,
-        use_case=use_case,
+    record_governance_metric(
+        METRIC_REQUEST_COUNT,
+        1,
+        {
+            "governance.trace_id": trace,
+            "governance.provider": provider,
+            "governance.workflow_type": use_case or "unknown",
+        },
     )
-    escalation = assess_human_escalation(risk=risk, privacy=privacy)
+    with governance_span(
+        SPAN_RISK_CLASSIFICATION,
+        {
+            "governance.trace_id": trace,
+            "governance.redaction_count": len(privacy.findings),
+            "governance.provider": provider,
+        },
+    ) as span:
+        risk = classify_request(
+            prompt,
+            contains_sensitive_data=privacy.contains_sensitive_data,
+            use_case=use_case,
+        )
+        span.set_attribute("governance.risk_tier", risk.risk_tier.value)
+        span.set_attribute("governance.workflow_type", risk.use_case)
+        record_governance_metric(
+            METRIC_RISK_TIER_DISTRIBUTION,
+            1,
+            {
+                "governance.trace_id": trace,
+                "governance.risk_tier": risk.risk_tier.value,
+                "governance.workflow_type": risk.use_case,
+            },
+        )
+
+    with governance_span(
+        SPAN_ESCALATION_HITL,
+        {
+            "governance.trace_id": trace,
+            "governance.risk_tier": risk.risk_tier.value,
+        },
+    ) as span:
+        escalation = assess_human_escalation(risk=risk, privacy=privacy)
+        span.set_attribute("governance.human_review_required", escalation.required)
+        span.set_attribute("governance.policy_ids", escalation.policy_ids)
+        if escalation.required:
+            record_governance_metric(
+                METRIC_HUMAN_ESCALATIONS_TOTAL,
+                1,
+                {
+                    "governance.trace_id": trace,
+                    "governance.risk_tier": risk.risk_tier.value,
+                },
+            )
+
     governed_prompt = privacy.redacted_text
-    decision = evaluate_provider_access(
-        provider=provider,
-        prompt=governed_prompt,
-        risk=risk,
-        privacy=privacy,
-    )
+    with governance_span(
+        SPAN_POLICY_EGRESS_CHECK,
+        {
+            "governance.trace_id": trace,
+            "governance.provider": provider,
+            "governance.risk_tier": risk.risk_tier.value,
+            "governance.redaction_count": len(privacy.findings),
+        },
+    ) as span:
+        decision = evaluate_provider_access(
+            provider=provider,
+            prompt=governed_prompt,
+            risk=risk,
+            privacy=privacy,
+        )
+        span.set_attribute("governance.policy_action", decision.action.value)
+        span.set_attribute("governance.policy_ids", decision.policy_ids)
+
     explanations = collect_governance_explanations(
         trace_id=trace,
         privacy=privacy,
@@ -79,6 +154,16 @@ def prepare_provider_request(
     _record_governance_events(context, decision)
 
     if decision.action == PolicyAction.BLOCK:
+        record_governance_metric(
+            METRIC_POLICY_VIOLATION_ATTEMPTS,
+            1,
+            {
+                "governance.trace_id": trace,
+                "governance.provider": provider,
+                "governance.policy_action": decision.action.value,
+                "governance.risk_tier": risk.risk_tier.value,
+            },
+        )
         raise GovernanceBlockedError(decision, trace)
 
     request = ProviderRequest(
@@ -99,11 +184,23 @@ def record_provider_success(
     tokens: int,
     risk_tier: RiskTier | None = None,
 ) -> None:
-    explanation = explain_final_output_boundary(
-        trace_id=trace_id,
-        provider=provider,
-        risk_tier=risk_tier,
-    )
+    model = MODEL_CONFIG.get(provider)
+    estimated_cost_usd = tokens * PRICING.get(provider, 0)
+    with governance_span(
+        SPAN_OUTPUT_SCHEMA_VALIDATION,
+        {
+            "governance.trace_id": trace_id,
+            "governance.provider": provider,
+            "governance.risk_tier": risk_tier.value if risk_tier else None,
+            "governance.estimated_cost_usd": estimated_cost_usd,
+            "gen_ai.response.model": model,
+        },
+    ):
+        explanation = explain_final_output_boundary(
+            trace_id=trace_id,
+            provider=provider,
+            risk_tier=risk_tier,
+        )
     append_audit_event(
         trace_id=trace_id,
         event_type="provider_call_succeeded",
@@ -122,6 +219,16 @@ def record_provider_success(
         provider=provider,
         risk_tier=risk_tier,
     )
+    record_governance_metric(
+        METRIC_ESTIMATED_COST_USD,
+        estimated_cost_usd,
+        {
+            "governance.trace_id": trace_id,
+            "governance.provider": provider,
+            "governance.risk_tier": risk_tier.value if risk_tier else None,
+            "gen_ai.response.model": model,
+        },
+    )
 
 
 def record_provider_failure(
@@ -132,6 +239,15 @@ def record_provider_failure(
     action: str,
     risk_tier: RiskTier | None = None,
 ) -> None:
+    record_governance_metric(
+        METRIC_ERROR_COUNT,
+        1,
+        {
+            "governance.trace_id": trace_id,
+            "governance.provider": provider,
+            "governance.risk_tier": risk_tier.value if risk_tier else None,
+        },
+    )
     explanation = explain_fallback_decision(
         trace_id=trace_id,
         provider=provider,
