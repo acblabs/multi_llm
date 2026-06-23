@@ -8,6 +8,8 @@
 | PHI/PII controls | C | R | C | A | C | C | C | C |
 | Provider egress policy | A | R | C | C | C | C | C | I |
 | Red-team eval | A | R | C | C | C | C | I | I |
+| Privacy redaction benchmark | C | R | C | A | C | C | I | I |
+| Prior-auth structured invariance regression | A | R | C | C | C | C | I | C |
 | HITL process | C | R | A | C | C | I | I | R |
 | Release approval | A | R | A | A | A | A | C | C |
 | Incident response | C | R | C | A | A | A | C | R |
@@ -18,5 +20,6 @@ Legend: R = Responsible, A = Accountable, C = Consulted, I = Informed.
 
 - Architecture defines the control points.
 - Engineering implements and tests the controls.
+- Deterministic evals are release evidence for the MVP control plane; they must document limitations and avoid production-grade claims.
 - Privacy, Compliance, Legal, and InfoSec approve production boundaries.
 - Operations owns the human-review workflow once deployed.

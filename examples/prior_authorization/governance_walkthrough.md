@@ -18,6 +18,7 @@ Summarize this prior authorization request for medication coverage and identify 
 7. `escalation.py` requires human review.
 8. `tools.py` sends the redacted prompt to approved third-party providers with retry/fallback.
 9. `audit.py` records privacy, risk, policy, evidence coverage, escalation, provider, and metric events.
+10. The deterministic eval scripts measure the same control path without external model calls.
 
 ## Evidence Coverage Output
 
@@ -34,6 +35,18 @@ The evidence coverage report identifies documentation elements as `present`, `mi
 - payer policy references, when supplied.
 
 The report stores source references and hashes over redacted excerpts rather than raw source excerpts. See `evidence_coverage_sample.json` for a sanitized example.
+
+## Regression Evidence
+
+Run the Phase 5 evals after changing governance controls or fixtures:
+
+```bash
+python scripts/run_redteam_eval.py
+python evals/privacy/run_redaction_benchmark.py
+python evals/fairness/run_invariance_eval.py
+```
+
+The red-team eval exercises prior-auth prompt-injection, PHI-exfiltration, egress-policy, autonomy-boundary, fallback, fanout, and hallucinated-evidence cases. The privacy benchmark gates only email, formatted phone, SSN, and member ID recall for the current regex redactor and reports bare-name and bare-date limitations. The structured invariance regression compares evidence-coverage statuses and decision boundaries across synthetic demographic variants rather than comparing free-text rationales.
 
 ## Expected Boundary
 

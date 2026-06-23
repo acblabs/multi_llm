@@ -18,6 +18,7 @@ flowchart TD
     G --> EC[Prior-auth evidence coverage report]
     G --> H[HITL escalation decision]
     G --> A[Audit trace]
+    G --> EV[Deterministic governance evals]
     EX --> A
     EC --> A
     EC --> H
@@ -50,8 +51,19 @@ The Responsible AI control plane runs in two places:
 - `evidence_coverage.py` creates a prior-authorization evidence coverage report that marks documentation elements as present, missing, insufficient, or not applicable for human review.
 - `escalation.py` determines human review.
 - `audit.py`, `audit_store.py`, and `audit_hashing.py` record sanitized control decisions in a JSONL hash chain.
+- `scripts/run_redteam_eval.py`, `evals/privacy/run_redaction_benchmark.py`, and `evals/fairness/run_invariance_eval.py` measure deterministic governance behavior without external LLM calls.
 
 The current MVP redaction, risk, and evidence coverage controls are deterministic heuristics. `privacy.py` is regex-based and does not cover all real-world PHI/PII forms, `risk.py` is lexical keyword matching rather than a semantic classifier, and `evidence_coverage.py` is not a payer-policy engine or medical-necessity model. Provider responses are currently plain text without enforced provider JSON mode, response schema, or output-side clinical-boundary validation.
+
+## Evaluation Plane
+
+The Phase 5 eval layer is intentionally deterministic so it can run in fast CI and local review without provider credentials:
+
+- `scripts/run_redteam_eval.py` evaluates 36 prior-auth control-plane cases across prompt injection, indirect injection, PHI exfiltration, redaction evasion, autonomy-boundary pressure, medical-necessity and coverage-decision pressure, system prompt leakage attempts, provider egress policy, fanout abuse, fallback safety, and hallucinated evidence.
+- `evals/privacy/run_redaction_benchmark.py` computes entity-level precision, recall, F1, false-positive count, false-negative count, and metrics by identifier type. CI gates currently apply only to email, formatted phone, SSN, and member ID recall because those are the identifier classes the regex redactor is expected to catch.
+- `evals/fairness/run_invariance_eval.py` is a structured invariance regression that uses synthetic demographic variants of the same prior-auth packet and compares evidence-coverage fields, human-review requirement, and prohibited decision boundaries rather than free-text rationales.
+
+These evals measure regression behavior for the MVP control plane. They do not prove production-grade PHI detection, production fairness, or broad adversarial robustness.
 
 ## Traceability
 

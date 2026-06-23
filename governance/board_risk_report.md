@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The MVP demonstrates a high-risk healthcare support workflow with controls for privacy, human oversight, auditability, and red-team evaluation. It is not approved for production use.
+The MVP demonstrates a high-risk healthcare support workflow with controls for privacy, human oversight, auditability, red-team evaluation, redaction benchmarking, and structured prior-auth invariance regression. It is not approved for production use.
 
 ## Key Risk Indicators
 
@@ -10,7 +10,10 @@ The MVP demonstrates a high-risk healthcare support workflow with controls for p
 | --- | --- | --- |
 | High-risk requests without HITL | 0 expected | 0 |
 | External calls with unredacted PHI/PII | 0 expected | 0 |
-| Prompt-injection red-team failures | Measured by eval report | 0 critical failures |
+| Prompt-injection red-team failures | 36 deterministic cases pass in `evals/redteam/prior_auth_redteam_report.md` | 0 critical failures |
+| Gated redaction recall failures | Email, formatted phone, SSN, and member ID gates pass in `evals/privacy/redaction_benchmark_report.md` | 0 gated failures |
+| Known redaction limitations | Bare-name and bare-date recall reported as non-gated limitations | Managed sensitive-data inspection or improved detector before production |
+| Prior-auth structured invariance failures | Synthetic structured-status invariance cases pass in `evals/fairness/invariance_report.md` | Clinically reviewed fairness plan before production |
 | Audit trace coverage | Required for governed calls | 100% |
 | Provider fallback without audit event | 0 expected | 0 |
 

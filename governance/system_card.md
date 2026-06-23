@@ -6,7 +6,7 @@ Governed Multi-LLM Prior-Authorization Assistant
 
 ## Summary
 
-This system demonstrates how a multi-LLM agent can be governed with pre-router PHI/PII redaction, risk tiering, defense-in-depth redaction before third-party egress, approved-provider egress policy, structured governance explanations, prior-auth evidence coverage reporting, human escalation, retry/fallback controls, schema validation, and PHI-safe audit logging.
+This system demonstrates how a multi-LLM agent can be governed with pre-router PHI/PII redaction, risk tiering, defense-in-depth redaction before third-party egress, approved-provider egress policy, structured governance explanations, prior-auth evidence coverage reporting, human escalation, deterministic privacy/red-team/invariance evals, retry/fallback controls, schema validation, and PHI-safe audit logging.
 
 ## Intended Users
 
@@ -26,6 +26,9 @@ Summarize prior-authorization documentation and identify missing administrative 
 - Evidence coverage reports organize documentation status for human review; they are not approval, denial, diagnosis, treatment, or medical-necessity outputs.
 - Does not replace clinical or payer review.
 - Uses heuristic PHI/PII redaction in the MVP; production requires managed sensitive-data inspection and validation.
+- Privacy benchmark gates are limited to email, formatted phone, SSN, and member ID recall. Bare names, bare dates, uncommon identifiers, multilingual names, and encoded or adversarial formats remain known limitations.
+- The red-team suite is a deterministic regression suite for the MVP governance path, not a live adversarial test against external LLMs.
+- The structured invariance regression uses synthetic demographic variants and compares evidence coverage outputs. It is not a production fairness validation.
 - External provider calls use verified LiteLLM model IDs: `gemini-3.5-flash`, `gpt-5.5`, `claude-opus-4-8`, and `xai/grok-4.3`.
 - The local ADK process receives user input, but `before_model_callback=redact_before_model` redacts the ADK model request before Gemini receives it. The MVP redacts again before egress to non-Google third-party LLM providers.
 - Production use requires privacy, logging, telemetry, and BAA/contract review for the managed GCP boundary and every external provider.
@@ -45,6 +48,7 @@ For the LLM MVP, explainability is provided through:
 - prior-auth evidence coverage status, source references, and hashes over redacted excerpts;
 - HITL escalation decisions;
 - a single audit trace ID that correlates the pre-router redaction, risk classification, policy decision, evidence coverage, HITL escalation, and provider-call events for one request (propagated through ADK session state and tool context).
+- deterministic eval reports for red-team controls, privacy redaction performance by identifier type, and structured prior-auth invariance behavior.
 
 SHAP, LIME, and counterfactual explanations are applicable to predictive/classical ML components if added later, but they are not claimed as implemented in this LLM-only MVP.
 

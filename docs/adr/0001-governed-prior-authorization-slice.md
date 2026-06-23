@@ -20,11 +20,12 @@ Build one prior-authorization vertical slice before expanding horizontally:
 6. Produce a prior-auth evidence coverage report for human review.
 7. Require HITL for high-risk workflows.
 8. Emit PHI-safe audit events with integrity verification.
-9. Produce a red-team eval report.
+9. Produce deterministic red-team, privacy redaction benchmark, and prior-auth invariance reports.
 
 ## Consequences
 
 - The repo stays focused and reviewer-friendly.
 - The multi-LLM story remains intact.
 - Governance controls are implemented in code instead of only described in documents.
+- Evals are deterministic and fast enough for local review and CI, but they remain MVP regression evidence rather than production safety, privacy, or fairness proof.
 - Broader framework mappings and GCP integrations remain expansion items until evidence exists.

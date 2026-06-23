@@ -14,7 +14,9 @@ This is an architecture-readiness crosswalk, not a certification claim. Each row
 | Audit trace (single trace ID per request) | `audit.py`, `observability.py` (`ensure_trace_id`), `pre_router.py` | Govern, Measure | Monitoring and evidence | Logging/monitoring | Audit controls | Logging and monitoring | Traceability to source documents |
 | Retry/fallback safety | `reliability.py`, `tools.py` | Manage | Operational resilience | Availability | Contingency operations | Model denial of service | Safe degradation |
 | Schema enforcement | `schemas.py` | Measure | Lifecycle controls | Processing integrity | Integrity controls | Insecure output handling | Structured evidence records |
-| Red-team eval | `scripts/run_redteam_eval.py` | Measure | Evaluation | Monitoring | Risk management | Prompt injection, sensitive disclosure | High-risk scenario testing |
+| Red-team eval | `scripts/run_redteam_eval.py`, `evals/redteam/prior_auth_redteam_cases.json`, `evals/redteam/prior_auth_redteam_report.md` | Measure | Evaluation | Monitoring | Risk management | Prompt injection, sensitive disclosure, excessive agency, model denial of service | High-risk scenario testing |
+| Redaction benchmark | `evals/privacy/run_redaction_benchmark.py`, `evals/privacy/labeled_phi_cases.jsonl`, `evals/privacy/redaction_benchmark_report.md` | Measure | Evaluation, data governance | Privacy monitoring | Minimum necessary, risk analysis | Sensitive information disclosure | PHI detection regression evidence |
+| Prior-auth structured invariance regression | `evals/fairness/run_invariance_eval.py`, `evals/fairness/prior_auth_invariance_cases.jsonl`, `evals/fairness/invariance_report.md` | Measure, Manage | Bias and performance monitoring | Risk monitoring | Risk analysis | Overreliance, excessive agency | Synthetic invariance regression evidence |
 
 ## Conditional Scope
 

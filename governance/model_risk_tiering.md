@@ -8,7 +8,7 @@ This project uses risk tiering to decide which controls must run before a multi-
 | --- | --- | --- |
 | Minimal | General productivity with no sensitive data or healthcare impact | Basic logging, schema validation |
 | Limited | Healthcare-adjacent support with no direct access-to-care impact | Privacy scan, policy check, audit event |
-| High | Prior authorization, benefit access, medical-necessity support, or PHI/PII | PHI/PII redaction, provider policy, structured explanations, evidence coverage report, HITL escalation, audit trace, red-team evidence |
+| High | Prior authorization, benefit access, medical-necessity support, or PHI/PII | PHI/PII redaction, provider policy, structured explanations, evidence coverage report, HITL escalation, audit trace, red-team evidence, privacy benchmark evidence, structured invariance evidence |
 | Prohibited | Autonomous diagnosis, treatment, final coverage approval/denial, or bypassing human review | Block execution and route to governance review |
 
 ## MVP Classification
@@ -31,3 +31,6 @@ The prior-authorization summarization path is classified as high risk because it
 - `multi_model_agent/evidence_coverage.py` creates the prior-auth documentation coverage report without raw source excerpts.
 - `multi_model_agent/escalation.py` requires human review for high-risk requests.
 - `multi_model_agent/audit.py` records sanitized control decisions.
+- `scripts/run_redteam_eval.py` measures deterministic prompt-injection, PHI-exfiltration, egress, autonomy-boundary, fallback, fanout, and hallucinated-evidence controls.
+- `evals/privacy/run_redaction_benchmark.py` measures redaction precision, recall, F1, and per-identifier metrics with realistic gates for the current regex redactor.
+- `evals/fairness/run_invariance_eval.py` compares structured evidence-coverage outputs across synthetic demographic variants rather than free-text rationales.

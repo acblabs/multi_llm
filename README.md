@@ -2,7 +2,7 @@
 
 Responsible AI control plane for a multi-LLM prior-authorization decision-support workflow.
 
-This repo demonstrates how to keep the core multi-LLM engineering story intact while adding the governance controls expected in regulated healthcare AI: pre-router PHI/PII redaction, risk tiering, defense-in-depth redaction before third-party egress, approved-provider egress policy, structured governance explanations, prior-auth evidence coverage reports, human-in-the-loop escalation and closure, retry/fallback safety, schema contracts for governance artifacts, observability helpers, and audit evidence.
+This repo demonstrates how to keep the core multi-LLM engineering story intact while adding the governance controls expected in regulated healthcare AI: pre-router PHI/PII redaction, risk tiering, defense-in-depth redaction before third-party egress, approved-provider egress policy, structured governance explanations, prior-auth evidence coverage reports, human-in-the-loop escalation and closure, deterministic privacy and red-team evals, prior-auth invariance checks, retry/fallback safety, schema contracts for governance artifacts, observability helpers, and audit evidence.
 
 This is an architecture MVP, not a production medical or coverage-decision system.
 
@@ -20,6 +20,7 @@ User request
        -> evidence coverage report for prior authorization
        -> HITL escalation decision
        -> HITL assignment and review closure
+       -> deterministic governance evals
        -> audit trace
   -> Multi-LLM data plane
        -> OpenAI / Claude / Grok perspectives
@@ -43,7 +44,7 @@ Prior-auth request
   -> HITL escalation
   -> HITL assignment and closure
   -> sanitized audit events
-  -> red-team eval evidence
+  -> red-team, privacy, and invariance eval evidence
 ```
 
 ## Multi-LLM Data Plane
@@ -84,6 +85,9 @@ The MVP governance path is implemented in code:
 | Schema contracts | `multi_model_agent/schemas.py` |
 | Retry/fallback safety | `multi_model_agent/reliability.py` |
 | Provider tool integration | `multi_model_agent/tools.py` |
+| Deterministic red-team eval | `scripts/run_redteam_eval.py`, `evals/redteam/prior_auth_redteam_cases.json` |
+| Privacy redaction benchmark | `evals/privacy/run_redaction_benchmark.py`, `evals/privacy/labeled_phi_cases.jsonl` |
+| Prior-auth structured invariance regression | `evals/fairness/run_invariance_eval.py`, `evals/fairness/prior_auth_invariance_cases.jsonl` |
 
 The ADK agent uses `before_model_callback=redact_before_model`, which redacts text in the Gemini router request before the model call. External provider calls are then prepared through `prepare_provider_request()`, which redacts sensitive data again and records privacy, risk, policy, evidence coverage, and escalation events before egress to non-Google third-party LLMs.
 
@@ -109,7 +113,9 @@ The current controls are intentionally deterministic and testable, but they are 
 - `evidence_coverage.py` uses deterministic keyword heuristics. It is useful for reviewer-facing coverage checks, but it is not a payer-policy engine, clinical classifier, or medical-necessity model.
 - Provider responses are plain text today. There is no enforced provider `response_format`, JSON schema, or post-response clinical-boundary validator on model outputs yet.
 - Runtime objects such as `GovernanceContext` and `PrivacyAssessment` may contain raw PHI during request processing. Safe views and audit persistence prevent those values from being written to durable artifacts, but production needs stricter runtime data-minimization and logging controls.
-- The deterministic red-team suite is still small and should be expanded before claiming broad adversarial robustness.
+- The deterministic red-team suite covers 36 MVP control-plane cases across prompt injection, PHI exfiltration, provider egress, autonomy-boundary, fallback, fanout, and hallucinated-evidence scenarios. It is still a fast regression suite, not proof of broad adversarial robustness.
+- The privacy benchmark gates only identifier types the current regex redactor is expected to catch: email, formatted phone, SSN, and member ID. Bare-name and bare-date recall are reported as known limitations, not CI blockers.
+- The prior-auth structured invariance regression uses synthetic demographic variants and compares evidence-coverage statuses, human-review requirement, and decision boundaries. It is not a production fairness validation.
 
 ## PHI-Safe Audit Chain
 
@@ -142,8 +148,11 @@ High-signal artifacts:
 - [Residual risk register](governance/residual_risk_register.md)
 - [Prior-auth walkthrough](examples/prior_authorization/governance_walkthrough.md)
 - [Evidence coverage sample](examples/prior_authorization/evidence_coverage_sample.json)
+- [Red-team report](evals/redteam/prior_auth_redteam_report.md)
+- [Privacy redaction benchmark report](evals/privacy/redaction_benchmark_report.md)
+- [Prior-auth invariance report](evals/fairness/invariance_report.md)
 
-## Red-Team Eval
+## Deterministic Governance Evals
 
 Run the focused MVP red-team suite:
 
@@ -151,7 +160,23 @@ Run the focused MVP red-team suite:
 python scripts/run_redteam_eval.py
 ```
 
-It checks prompt-injection and PHI-exfiltration cases without calling external LLM providers.
+It checks 36 deterministic cases across direct and indirect prompt injection, PHI exfiltration, redaction evasion, autonomy-boundary pressure, medical-necessity and coverage-decision pressure, system prompt leakage attempts, provider egress policy, fanout abuse, fallback safety, and hallucinated evidence. It does not call external LLM providers.
+
+Run the privacy benchmark:
+
+```bash
+python evals/privacy/run_redaction_benchmark.py
+```
+
+The benchmark reports precision, recall, F1, false positives, false negatives, and metrics by identifier type. Fast gates currently apply only to email, formatted phone, SSN, and member ID recall. Bare names and bare dates are tracked as non-gated limitations.
+
+Run the prior-auth structured invariance regression:
+
+```bash
+python evals/fairness/run_invariance_eval.py
+```
+
+The invariance regression uses synthetic demographic and identity variants of the same prior-auth packet. It compares structured evidence-coverage fields (`requirement_id`, `status`), human-review requirement, and prohibited decision boundaries rather than free-text rationales.
 
 Run unit tests:
 
@@ -167,7 +192,7 @@ This repo includes opt-in hooks for local guardrails:
 git config core.hooksPath .githooks
 ```
 
-The pre-commit hook blocks generated audit logs by path and by parsing staged JSON/JSONL for `audit.v1` stored events. It also requires at least one core reviewer-facing doc to be staged whenever governance or implementation files are staged: `README.md`, `docs/architecture.md`, `examples/prior_authorization/governance_walkthrough.md`, `governance/system_card.md`, `governance/model_risk_tiering.md`, or `governance/ai_impact_assessment.md`. Test-only commits do not trigger this documentation gate. The hook then runs compile checks. The pre-push hook runs unit tests and the deterministic red-team eval. Set `PYTHON=/path/to/python` before invoking Git if your shell does not expose `python` on `PATH`. These hooks are useful local tripwires, but CI should remain the source of record for required governance checks.
+The pre-commit hook blocks generated audit logs by path and by parsing staged JSON/JSONL for `audit.v1` stored events. It also requires at least one core reviewer-facing doc to be staged whenever governance or implementation files are staged: `README.md`, `docs/architecture.md`, `examples/prior_authorization/governance_walkthrough.md`, `governance/system_card.md`, `governance/model_risk_tiering.md`, or `governance/ai_impact_assessment.md`. Test-only commits do not trigger this documentation gate. The hook then runs compile checks. The pre-push hook runs unit tests and the deterministic red-team eval. Run the privacy and invariance evals locally before reviewer handoff when changing `privacy.py`, `evidence_coverage.py`, `risk.py`, `policy.py`, or eval fixtures. Set `PYTHON=/path/to/python` before invoking Git if your shell does not expose `python` on `PATH`. These hooks are useful local tripwires, but CI should remain the source of record for required governance checks.
 
 ## Deployment Profile
 

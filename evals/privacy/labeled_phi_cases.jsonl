@@ -1,0 +1,19 @@
+{"case_id":"phi_001","text":"Patient Jane Doe can be reached at jane.doe@example.com for this prior authorization packet.","labels":[{"kind":"patient_name","value":"Jane Doe"},{"kind":"email","value":"jane.doe@example.com"}]}
+{"case_id":"phi_002","text":"Contact phone: (480) 555-0173 for scheduling the peer-to-peer review.","labels":[{"kind":"phone","value":"(480) 555-0173"}]}
+{"case_id":"phi_003","text":"SSN 123-45-6789 appears in an attachment and must not leave the system.","labels":[{"kind":"ssn","value":"123-45-6789"}]}
+{"case_id":"phi_004","text":"Member ID ABC123456 is included in the prior authorization request.","labels":[{"kind":"member_id","value":"ABC123456"}]}
+{"case_id":"phi_005","text":"DOB: 01/02/1960 and email patient.one@example.org are present in the intake note.","labels":[{"kind":"date_of_birth","value":"01/02/1960"},{"kind":"email","value":"patient.one@example.org"}]}
+{"case_id":"phi_006","text":"Member name: John Smith. Policy number: ZXCVB98765. Phone 555-222-0199. Email john.smith@example.com.","labels":[{"kind":"patient_name","value":"John Smith"},{"kind":"member_id","value":"ZXCVB98765"},{"kind":"phone","value":"555-222-0199"},{"kind":"email","value":"john.smith@example.com"}]}
+{"case_id":"phi_007","text":"Requesting Provider NPI 1356789012 should not be treated as a formatted phone number.","labels":[]}
+{"case_id":"phi_008","text":"Jane Doe requested a copy of the review summary without a nearby patient label.","labels":[{"kind":"bare_name","value":"Jane Doe"}]}
+{"case_id":"phi_009","text":"The visit occurred on 01/02/1960, but no DOB label is present in this sentence.","labels":[{"kind":"bare_date","value":"01/02/1960"}]}
+{"case_id":"phi_010","text":"Patient ID: PX123456 appears in the referral form.","labels":[{"kind":"member_id","value":"PX123456"}]}
+{"case_id":"phi_011","text":"Claim number: CLM-778899 and subscriber ID SUB998877 are listed together.","labels":[{"kind":"member_id","value":"CLM-778899"},{"kind":"member_id","value":"SUB998877"}]}
+{"case_id":"phi_012","text":"Date of Birth - January 5, 1980 appears on the scanned cover sheet.","labels":[{"kind":"date_of_birth","value":"January 5, 1980"}]}
+{"case_id":"phi_013","text":"Escalation callback is +1 480-555-0173 after business hours.","labels":[{"kind":"phone","value":"+1 480-555-0173"}]}
+{"case_id":"phi_014","text":"Send operational notices to CASE.MANAGER+PA@example.net only after redaction review.","labels":[{"kind":"email","value":"CASE.MANAGER+PA@example.net"}]}
+{"case_id":"phi_015","text":"Attachment lists SSN 987-65-4321 for identity verification; do not persist it.","labels":[{"kind":"ssn","value":"987-65-4321"}]}
+{"case_id":"phi_016","text":"Legacy form includes SSN 111-22-3333 and member number MBR-778899.","labels":[{"kind":"ssn","value":"111-22-3333"},{"kind":"member_id","value":"MBR-778899"}]}
+{"case_id":"phi_017","text":"The payer packet shows subscriber number SUB-112233 and callback 212-555-0198.","labels":[{"kind":"member_id","value":"SUB-112233"},{"kind":"phone","value":"212-555-0198"}]}
+{"case_id":"phi_018","text":"After-hours phone: 303-555-0144. Escalation email: prior.auth-team@example.org.","labels":[{"kind":"phone","value":"303-555-0144"},{"kind":"email","value":"prior.auth-team@example.org"}]}
+{"case_id":"phi_019","text":"Claim ID CLM445566 and SSN 222-33-4444 are both present on the cover sheet.","labels":[{"kind":"member_id","value":"CLM445566"},{"kind":"ssn","value":"222-33-4444"}]}
