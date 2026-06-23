@@ -197,6 +197,20 @@ class HumanReviewTests(unittest.TestCase):
         )
         self.assertTrue(state.audit_chain_valid)
 
+    def test_resolve_trace_state_returns_canonical_trace_id(self):
+        raw_trace_id = "trace review/state with spaces"
+        prepare_provider_request(
+            provider="openai",
+            prompt=PHI_PROMPT,
+            trace_id=raw_trace_id,
+        )
+
+        state = resolve_trace_state(raw_trace_id)
+
+        self.assertTrue(state.trace_id.startswith("trace:"))
+        self.assertNotEqual(state.trace_id, raw_trace_id)
+        self.assertTrue(state.human_review_assigned)
+
     def test_record_human_review_cli_records_sanitized_completion(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "audit.jsonl"

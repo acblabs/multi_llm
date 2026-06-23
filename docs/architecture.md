@@ -19,9 +19,12 @@ flowchart TD
     G --> H[HITL escalation decision]
     G --> A[Audit trace]
     G --> EV[Deterministic governance evals]
+    G --> EP[Reviewer evidence packet]
+    EV --> SC[Governance scorecard]
     EX --> A
     EC --> A
     EC --> H
+    A --> EP
     E -->|redacted prompt only| O[OpenAI]
     E -->|redacted prompt only| C[Claude]
     E -->|redacted prompt only| X[Grok]
@@ -50,8 +53,11 @@ The Responsible AI control plane runs in two places:
 - `explainer.py` creates deterministic governance explanations with reason codes, policy IDs, and safe human-readable rationale without Chain-of-Thought.
 - `evidence_coverage.py` creates a prior-authorization evidence coverage report that marks documentation elements as present, missing, insufficient, or not applicable for human review.
 - `escalation.py` determines human review.
+- `review.py` records human review closure and derives terminal trace state from sanitized audit events.
 - `audit.py`, `audit_store.py`, and `audit_hashing.py` record sanitized control decisions in a JSONL hash chain.
+- `evidence_packet.py` exports reviewer-ready packets from sanitized JSONL audit logs.
 - `scripts/run_redteam_eval.py`, `evals/privacy/run_redaction_benchmark.py`, and `evals/fairness/run_invariance_eval.py` measure deterministic governance behavior without external LLM calls.
+- `scripts/generate_governance_scorecard.py` summarizes deterministic reports and sample audit verification into `governance/governance_scorecard.md`.
 
 The current MVP redaction, risk, and evidence coverage controls are deterministic heuristics. `privacy.py` is regex-based and does not cover all real-world PHI/PII forms, `risk.py` is lexical keyword matching rather than a semantic classifier, and `evidence_coverage.py` is not a payer-policy engine or medical-necessity model. Provider responses are currently plain text without enforced provider JSON mode, response schema, or output-side clinical-boundary validation.
 
@@ -64,6 +70,16 @@ The Phase 5 eval layer is intentionally deterministic so it can run in fast CI a
 - `evals/fairness/run_invariance_eval.py` is a structured invariance regression that uses synthetic demographic variants of the same prior-auth packet and compares evidence-coverage fields, human-review requirement, and prohibited decision boundaries rather than free-text rationales.
 
 These evals measure regression behavior for the MVP control plane. They do not prove production-grade PHI detection, production fairness, or broad adversarial robustness.
+
+## Evidence Packaging And CI
+
+`scripts/export_audit_packet.py --trace-id TRACE_ID --audit-log PATH` creates a reviewer packet under `examples/evidence_packets/` by default. The packet contains sanitized audit events, audit-chain verification, terminal trace state, governance explanations, evidence coverage, redaction summary, model provenance, human review status, and a markdown reviewer summary. Packet export uses the canonical stored trace ID, rebuilds the packet folder on each export, and derives trace state through the shared `review.replay_trace_state()` helper rather than replaying events separately.
+
+Redaction totals in packets are finding observations summed across audit events. They are not deduplicated patient/entity counts because the audit log does not retain raw values or stable redaction span IDs. The packet exposes `source_event_count` and `counting_strategy` so reviewers can interpret the count correctly.
+
+`.github/workflows/governance-ci.yml` runs fast deterministic governance checks for pull requests and manual dispatches. It runs the full unit suite, discrete human-review and observability tests, red-team eval, privacy benchmark, invariance eval, sample audit-chain verification, and scorecard generation. The scorecard uses actual GitHub Actions step outcomes for unit, human-review, and observability controls. It also reports markdown-summary parse errors if an eval report format changes. Uploaded CI artifacts include eval reports, the scorecard, and the evidence packet folder.
+
+Cloud Build remains the GCP deployment and deployment-evidence workflow. GitHub Actions owns repository governance checks and reviewer artifacts; it does not replace `cloudbuild.yaml`.
 
 ## Observability Plane
 

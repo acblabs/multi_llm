@@ -18,7 +18,9 @@ Summarize this prior authorization request for medication coverage and identify 
 7. `escalation.py` requires human review.
 8. `tools.py` sends the redacted prompt to approved third-party providers with retry/fallback.
 9. `audit.py` records privacy, risk, policy, evidence coverage, escalation, provider, and metric events.
-10. The deterministic eval scripts measure the same control path without external model calls.
+10. `scripts/export_audit_packet.py` can package the sanitized trace for reviewer inspection.
+11. The deterministic eval scripts measure the same control path without external model calls.
+12. `scripts/generate_governance_scorecard.py` summarizes local eval reports and sample audit verification.
 
 ## Evidence Coverage Output
 
@@ -36,6 +38,16 @@ The evidence coverage report identifies documentation elements as `present`, `mi
 
 The report stores source references and hashes over redacted excerpts rather than raw source excerpts. See `evidence_coverage_sample.json` for a sanitized example.
 
+## Reviewer Evidence Packet
+
+After a trace is present in a JSONL audit log, export a sanitized packet with:
+
+```bash
+python scripts/export_audit_packet.py --trace-id TRACE_ID --audit-log audit_logs/dev_audit.jsonl
+```
+
+The packet includes sanitized audit events, audit-chain verification, terminal trace state, governance explanations, evidence coverage, redaction summary, model provenance, human review status, and a reviewer summary. Redaction totals are finding observations across audit events, not deduplicated per-request entity counts.
+
 ## Regression Evidence
 
 Run the Phase 5 evals after changing governance controls or fixtures:
@@ -44,9 +56,10 @@ Run the Phase 5 evals after changing governance controls or fixtures:
 python scripts/run_redteam_eval.py
 python evals/privacy/run_redaction_benchmark.py
 python evals/fairness/run_invariance_eval.py
+python scripts/generate_governance_scorecard.py
 ```
 
-The red-team eval exercises prior-auth prompt-injection, PHI-exfiltration, egress-policy, autonomy-boundary, fallback, fanout, and hallucinated-evidence cases. The privacy benchmark gates only email, formatted phone, SSN, and member ID recall for the current regex redactor and reports bare-name and bare-date limitations. The structured invariance regression compares evidence-coverage statuses and decision boundaries across synthetic demographic variants rather than comparing free-text rationales.
+The red-team eval exercises prior-auth prompt-injection, PHI-exfiltration, egress-policy, autonomy-boundary, fallback, fanout, and hallucinated-evidence cases. The privacy benchmark gates only email, formatted phone, SSN, and member ID recall for the current regex redactor and reports bare-name and bare-date limitations. The structured invariance regression compares evidence-coverage statuses and decision boundaries across synthetic demographic variants rather than comparing free-text rationales. The scorecard is repository governance evidence, while Cloud Build remains the GCP deployment and deployment-evidence path.
 
 ## Expected Boundary
 

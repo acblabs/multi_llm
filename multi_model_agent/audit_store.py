@@ -238,7 +238,7 @@ class InMemoryAuditStore:
             return stored
 
     def query_by_trace_id(self, trace_id: str) -> list[StoredAuditEvent]:
-        safe_trace_id = _safe_identifier(trace_id, label="trace")
+        safe_trace_id = safe_audit_identifier(trace_id, label="trace")
         with self._lock:
             return [event for event in self._events if event.trace_id == safe_trace_id]
 
@@ -279,7 +279,7 @@ class JsonlAuditStore:
             return stored
 
     def query_by_trace_id(self, trace_id: str) -> list[StoredAuditEvent]:
-        safe_trace_id = _safe_identifier(trace_id, label="trace")
+        safe_trace_id = safe_audit_identifier(trace_id, label="trace")
         with self._lock:
             return [
                 event for event in self._load_events() if event.trace_id == safe_trace_id
@@ -404,15 +404,15 @@ def _build_stored_event(
     previous_hash: str | None,
 ) -> StoredAuditEvent:
     data = _event_to_dict(event)
-    trace_id = _safe_identifier(str(data.get("trace_id", "")), label="trace")
-    event_type = _safe_identifier(str(data.get("event_type", "")), label="event_type")
+    trace_id = safe_audit_identifier(str(data.get("trace_id", "")), label="trace")
+    event_type = safe_audit_identifier(str(data.get("event_type", "")), label="event_type")
     if not trace_id:
         raise ValueError("Audit events require a trace_id")
     if not event_type:
         raise ValueError("Audit events require an event_type")
 
     timestamp = _coerce_timestamp(data.get("timestamp"))
-    event_id = _safe_identifier(str(data.get("event_id") or uuid4()), label="event")
+    event_id = safe_audit_identifier(str(data.get("event_id") or uuid4()), label="event")
     payload = sanitize_for_persistence(event)
     payload_hash = compute_payload_hash(payload)
     event_hash = compute_event_hash(
@@ -591,6 +591,10 @@ def _safe_human_review_decision(value: Any) -> dict[str, Any]:
         return {}
 
     return decision.to_safe_dict()
+
+
+def safe_audit_identifier(value: str, *, label: str) -> str:
+    return _safe_identifier(value, label=label)
 
 
 def _safe_identifier(value: str, *, label: str) -> str:

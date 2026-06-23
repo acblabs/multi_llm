@@ -2,7 +2,7 @@
 
 Responsible AI control plane for a multi-LLM prior-authorization decision-support workflow.
 
-This repo demonstrates how to keep the core multi-LLM engineering story intact while adding the governance controls expected in regulated healthcare AI: pre-router PHI/PII redaction, risk tiering, defense-in-depth redaction before third-party egress, approved-provider egress policy, structured governance explanations, prior-auth evidence coverage reports, human-in-the-loop escalation and closure, deterministic privacy and red-team evals, prior-auth invariance checks, retry/fallback safety, schema contracts for governance artifacts, observability helpers, and audit evidence.
+This repo demonstrates how to keep the core multi-LLM engineering story intact while adding the governance controls expected in regulated healthcare AI: pre-router PHI/PII redaction, risk tiering, defense-in-depth redaction before third-party egress, approved-provider egress policy, structured governance explanations, prior-auth evidence coverage reports, human-in-the-loop escalation and closure, deterministic privacy and red-team evals, prior-auth invariance checks, retry/fallback safety, schema contracts for governance artifacts, observability helpers, evidence packet export, governance scorecards, CI evidence, and audit evidence.
 
 This is an architecture MVP, not a production medical or coverage-decision system.
 
@@ -22,6 +22,7 @@ User request
        -> HITL assignment and review closure
        -> deterministic governance evals
        -> audit trace
+       -> reviewer evidence packet and scorecard
   -> Multi-LLM data plane
        -> OpenAI / Claude / Grok perspectives
        -> Gemini synthesis
@@ -44,6 +45,8 @@ Prior-auth request
   -> HITL escalation
   -> HITL assignment and closure
   -> sanitized audit events
+  -> reviewer evidence packet
+  -> governance scorecard
   -> red-team, privacy, and invariance eval evidence
 ```
 
@@ -88,6 +91,9 @@ The MVP governance path is implemented in code:
 | Retry/fallback safety | `multi_model_agent/reliability.py` |
 | Provider tool integration | `multi_model_agent/tools.py` |
 | Optional OpenTelemetry governance observability | `multi_model_agent/telemetry.py`, `docs/observability.md` |
+| Reviewer evidence packets | `multi_model_agent/evidence_packet.py`, `scripts/export_audit_packet.py` |
+| Governance scorecard | `scripts/generate_governance_scorecard.py`, `governance/governance_scorecard.md` |
+| Repository governance CI | `.github/workflows/governance-ci.yml` |
 | Deterministic red-team eval | `scripts/run_redteam_eval.py`, `evals/redteam/prior_auth_redteam_cases.json` |
 | Privacy redaction benchmark | `evals/privacy/run_redaction_benchmark.py`, `evals/privacy/labeled_phi_cases.jsonl` |
 | Prior-auth structured invariance regression | `evals/fairness/run_invariance_eval.py`, `evals/fairness/prior_auth_invariance_cases.jsonl` |
@@ -102,6 +108,14 @@ Human review is represented as an append-only lifecycle. High-risk prior-authori
 export MULTI_LLM_REVIEW_HMAC_KEY=local-demo-secret
 python scripts/record_human_review.py --trace-id TRACE_ID --reviewer-id reviewer-123 --decision accepted --rationale "Reviewed against supplied documentation."
 ```
+
+Reviewer-ready evidence packets can be exported for any trace present in a JSONL audit log:
+
+```bash
+python scripts/export_audit_packet.py --trace-id TRACE_ID --audit-log audit_logs/dev_audit.jsonl
+```
+
+Each packet folder contains sanitized audit events, chain verification, terminal trace state, governance explanations, evidence coverage, redaction summary, model provenance, human review status, and a reviewer summary. Packet export rebuilds the trace folder on each run and uses the canonical stored trace ID in the packet contents.
 
 Trust boundary note: the local ADK process receives user input, but no model should receive raw PHI/PII by default. The MVP redacts the ADK model request before the Gemini router call and redacts again before third-party provider calls. Raw PHI/PII may still exist in ADK session state/history or platform logs before callback redaction; production requires ingest-time redaction before session write and strict content-logging controls.
 
@@ -119,6 +133,8 @@ The current controls are intentionally deterministic and testable, but they are 
 - The deterministic red-team suite covers 36 MVP control-plane cases across prompt injection, PHI exfiltration, provider egress, autonomy-boundary, fallback, fanout, and hallucinated-evidence scenarios. It is still a fast regression suite, not proof of broad adversarial robustness.
 - The privacy benchmark gates only identifier types the current regex redactor is expected to catch: email, formatted phone, SSN, and member ID. Bare-name and bare-date recall are reported as known limitations, not CI blockers.
 - The prior-auth structured invariance regression uses synthetic demographic variants and compares evidence-coverage statuses, human-review requirement, and decision boundaries. It is not a production fairness validation.
+- Evidence packet redaction totals are finding observations summed across audit events, not deduplicated per-request entity counts. The packet includes `source_event_count` and `counting_strategy` to make this explicit.
+- The scorecard's `sample_phi_regression_guard_passed` field is a regression check over known synthetic sample values in committed artifacts, not a general PHI detector. General PHI safety still depends on sanitize-on-write, safe views, and targeted privacy tests.
 
 ## PHI-Safe Audit Chain
 
@@ -152,6 +168,7 @@ High-signal artifacts:
 - [Residual risk register](governance/residual_risk_register.md)
 - [Prior-auth walkthrough](examples/prior_authorization/governance_walkthrough.md)
 - [Evidence coverage sample](examples/prior_authorization/evidence_coverage_sample.json)
+- [Governance scorecard](governance/governance_scorecard.md)
 - [Red-team report](evals/redteam/prior_auth_redteam_report.md)
 - [Privacy redaction benchmark report](evals/privacy/redaction_benchmark_report.md)
 - [Prior-auth invariance report](evals/fairness/invariance_report.md)
@@ -188,6 +205,14 @@ Run unit tests:
 python -m unittest discover -s tests
 ```
 
+Generate the governance scorecard from local reports:
+
+```bash
+python scripts/generate_governance_scorecard.py
+```
+
+GitHub Actions runs repository governance checks on pull requests and manual dispatches. The workflow runs unit tests, discrete human-review and observability test modules, the deterministic red-team eval, the privacy benchmark, the invariance eval, sample audit-chain verification, and scorecard generation. It uploads the red-team report, privacy benchmark report, invariance report, scorecard, and evidence packet folder as artifacts. Cloud Build remains the GCP deployment and deployment-evidence workflow; GitHub Actions does not replace it.
+
 ## Optional Git Hooks
 
 This repo includes opt-in hooks for local guardrails:
@@ -211,6 +236,8 @@ MVP deployment artifacts:
 - `deployment/gcp/safety_screening_policy.yaml`
 
 Cloud Build is validation-only in the MVP. Live deployment, agent inventory registration, governed capability registration, and managed safety-screening integration are expansion items until implemented for real.
+
+Repository governance CI lives in `.github/workflows/governance-ci.yml`. It is scoped to fast deterministic checks and evidence artifact generation. Cloud Build remains the GCP deployment path.
 
 ## Standards Scope
 

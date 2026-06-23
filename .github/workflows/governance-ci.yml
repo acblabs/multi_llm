@@ -1,0 +1,118 @@
+name: Governance CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  governance-checks:
+    name: Governance Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: python -m pip install -r multi_model_agent/requirements.txt
+
+      - name: Run unit tests
+        id: unit-tests
+        continue-on-error: true
+        run: python -m unittest discover -s tests
+
+      - name: Run human-review control tests
+        id: human-review-controls
+        continue-on-error: true
+        run: python -m unittest tests.test_human_review
+
+      - name: Run observability tests
+        id: observability-tests
+        continue-on-error: true
+        run: python -m unittest tests.test_telemetry
+
+      - name: Run deterministic red-team eval
+        id: redteam-eval
+        continue-on-error: true
+        run: python scripts/run_redteam_eval.py
+
+      - name: Run privacy redaction benchmark
+        id: privacy-benchmark
+        continue-on-error: true
+        run: python evals/privacy/run_redaction_benchmark.py
+
+      - name: Run prior-auth invariance eval
+        id: invariance-eval
+        continue-on-error: true
+        run: python evals/fairness/run_invariance_eval.py
+
+      - name: Verify sample audit chain
+        id: audit-chain
+        continue-on-error: true
+        run: python scripts/verify_audit_chain.py examples/audit/sample_audit_chain.jsonl
+
+      - name: Export sample evidence packet
+        id: evidence-packet
+        continue-on-error: true
+        run: |
+          python scripts/export_audit_packet.py \
+            --trace-id sample-trace-001 \
+            --audit-log examples/audit/sample_audit_chain.jsonl \
+            --output-dir examples/evidence_packets
+
+      - name: Generate governance scorecard
+        id: governance-scorecard
+        if: always()
+        # Keep artifact generation alive after earlier failures; the final
+        # summary step below still fails the job with all failed checks listed.
+        continue-on-error: true
+        env:
+          GOVERNANCE_UNIT_TESTS_PASSED: ${{ steps.unit-tests.outcome == 'success' }}
+          GOVERNANCE_HUMAN_REVIEW_CONTROLS_PASSED: ${{ steps.human-review-controls.outcome == 'success' }}
+          GOVERNANCE_OBSERVABILITY_TESTS_PASSED: ${{ steps.observability-tests.outcome == 'success' }}
+        run: |
+          rm -f governance/governance_scorecard.md
+          python scripts/generate_governance_scorecard.py
+
+      - name: Upload governance artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: governance-evidence
+          if-no-files-found: warn
+          path: |
+            evals/redteam/prior_auth_redteam_report.md
+            evals/privacy/redaction_benchmark_report.md
+            evals/fairness/invariance_report.md
+            governance/governance_scorecard.md
+            examples/evidence_packets/
+
+      - name: Fail on governance check failure
+        if: always()
+        run: |
+          failed=()
+          if [ "${{ steps.unit-tests.outcome }}" != "success" ]; then failed+=("unit-tests=${{ steps.unit-tests.outcome }}"); fi
+          if [ "${{ steps.human-review-controls.outcome }}" != "success" ]; then failed+=("human-review-controls=${{ steps.human-review-controls.outcome }}"); fi
+          if [ "${{ steps.observability-tests.outcome }}" != "success" ]; then failed+=("observability-tests=${{ steps.observability-tests.outcome }}"); fi
+          if [ "${{ steps.redteam-eval.outcome }}" != "success" ]; then failed+=("redteam-eval=${{ steps.redteam-eval.outcome }}"); fi
+          if [ "${{ steps.privacy-benchmark.outcome }}" != "success" ]; then failed+=("privacy-benchmark=${{ steps.privacy-benchmark.outcome }}"); fi
+          if [ "${{ steps.invariance-eval.outcome }}" != "success" ]; then failed+=("invariance-eval=${{ steps.invariance-eval.outcome }}"); fi
+          if [ "${{ steps.audit-chain.outcome }}" != "success" ]; then failed+=("audit-chain=${{ steps.audit-chain.outcome }}"); fi
+          if [ "${{ steps.evidence-packet.outcome }}" != "success" ]; then failed+=("evidence-packet=${{ steps.evidence-packet.outcome }}"); fi
+          if [ "${{ steps.governance-scorecard.outcome }}" != "success" ]; then failed+=("governance-scorecard=${{ steps.governance-scorecard.outcome }}"); fi
+
+          if [ "${#failed[@]}" -gt 0 ]; then
+            printf 'Governance CI failed checks:\n'
+            printf ' - %s\n' "${failed[@]}"
+            exit 1
+          fi
+
+          echo "All governance checks passed."

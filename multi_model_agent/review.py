@@ -5,7 +5,9 @@ from hashlib import sha256
 from typing import Any
 
 from .audit import append_audit_event, get_audit_log, verify_audit_chain
+from .audit_store import safe_audit_identifier
 from .schemas import (
+    AuditVerificationResult,
     HumanReviewDecision,
     HumanReviewDecisionValue,
     RiskTier,
@@ -122,6 +124,23 @@ def resolve_trace_state(trace_id: str) -> TraceState:
     """
     events = get_audit_log(trace_id)
     verification = verify_audit_chain()
+    resolved_trace_id = (
+        str(events[0].get("trace_id")) if events else safe_audit_identifier(trace_id, label="trace")
+    )
+    return replay_trace_state(
+        trace_id=resolved_trace_id,
+        events=events,
+        verification=verification,
+    )
+
+
+def replay_trace_state(
+    *,
+    trace_id: str,
+    events: list[dict[str, Any]],
+    verification: AuditVerificationResult,
+) -> TraceState:
+    """Derive terminal trace state from sanitized audit event dictionaries."""
     state: dict[str, Any] = {
         "trace_id": trace_id,
         "latest_risk_tier": None,

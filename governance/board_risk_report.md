@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The MVP demonstrates a high-risk healthcare support workflow with controls for privacy, human oversight, auditability, red-team evaluation, redaction benchmarking, and structured prior-auth invariance regression. It is not approved for production use.
+The MVP demonstrates a high-risk healthcare support workflow with controls for privacy, human oversight, auditability, reviewer evidence packets, governance scorecards, red-team evaluation, redaction benchmarking, and structured prior-auth invariance regression. It is not approved for production use.
 
 ## Key Risk Indicators
 
@@ -15,6 +15,8 @@ The MVP demonstrates a high-risk healthcare support workflow with controls for p
 | Known redaction limitations | Bare-name and bare-date recall reported as non-gated limitations | Managed sensitive-data inspection or improved detector before production |
 | Prior-auth structured invariance failures | Synthetic structured-status invariance cases pass in `evals/fairness/invariance_report.md` | Clinically reviewed fairness plan before production |
 | Audit trace coverage | Required for governed calls | 100% |
+| Reviewer evidence packet availability | `scripts/export_audit_packet.py` packages sanitized trace artifacts for a supplied trace ID | Automated packet generation for deployment review workflows |
+| Governance scorecard freshness | `governance/governance_scorecard.md` generated from deterministic reports and sample audit verification | CI-published scorecard for each reviewed change |
 | Provider fallback without audit event | 0 expected | 0 |
 
 ## Open Decisions
