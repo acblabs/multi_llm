@@ -2,7 +2,7 @@
 
 Responsible AI control plane for a multi-LLM prior-authorization decision-support workflow.
 
-This repo demonstrates how to keep the core multi-LLM engineering story intact while adding the governance controls expected in regulated healthcare AI: pre-router PHI/PII redaction, risk tiering, defense-in-depth redaction before third-party egress, approved-provider egress policy, structured governance explanations, prior-auth evidence coverage reports, human-in-the-loop escalation, retry/fallback safety, schema contracts for governance artifacts, observability helpers, and audit evidence.
+This repo demonstrates how to keep the core multi-LLM engineering story intact while adding the governance controls expected in regulated healthcare AI: pre-router PHI/PII redaction, risk tiering, defense-in-depth redaction before third-party egress, approved-provider egress policy, structured governance explanations, prior-auth evidence coverage reports, human-in-the-loop escalation and closure, retry/fallback safety, schema contracts for governance artifacts, observability helpers, and audit evidence.
 
 This is an architecture MVP, not a production medical or coverage-decision system.
 
@@ -19,6 +19,7 @@ User request
        -> structured governance explanations
        -> evidence coverage report for prior authorization
        -> HITL escalation decision
+       -> HITL assignment and review closure
        -> audit trace
   -> Multi-LLM data plane
        -> OpenAI / Claude / Grok perspectives
@@ -40,6 +41,7 @@ Prior-auth request
   -> evidence coverage report
   -> multi-LLM orchestration
   -> HITL escalation
+  -> HITL assignment and closure
   -> sanitized audit events
   -> red-team eval evidence
 ```
@@ -77,7 +79,7 @@ The MVP governance path is implemented in code:
 | Provider egress policy | `multi_model_agent/policy.py` |
 | Structured governance explanations | `multi_model_agent/explainer.py` |
 | Prior-auth evidence coverage report | `multi_model_agent/evidence_coverage.py` |
-| HITL escalation | `multi_model_agent/escalation.py` |
+| HITL escalation and review closure | `multi_model_agent/escalation.py`, `multi_model_agent/review.py`, `scripts/record_human_review.py` |
 | PHI-safe audit trace and hash-chain verification | `multi_model_agent/audit.py`, `multi_model_agent/audit_store.py`, `multi_model_agent/audit_hashing.py` |
 | Schema contracts | `multi_model_agent/schemas.py` |
 | Retry/fallback safety | `multi_model_agent/reliability.py` |
@@ -86,6 +88,13 @@ The MVP governance path is implemented in code:
 The ADK agent uses `before_model_callback=redact_before_model`, which redacts text in the Gemini router request before the model call. External provider calls are then prepared through `prepare_provider_request()`, which redacts sensitive data again and records privacy, risk, policy, evidence coverage, and escalation events before egress to non-Google third-party LLMs.
 
 For prior-authorization workflows, `evidence_coverage.py` produces a deterministic `EvidenceCoverageReport` that labels required documentation elements as `present`, `missing`, `insufficient`, or `not_applicable`. The report stores source references and hashes over redacted excerpts, not raw excerpts. It is support for human review only; it must not approve care, deny coverage, determine medical necessity, diagnose, or recommend treatment.
+
+Human review is represented as an append-only lifecycle. High-risk prior-authorization requests emit `human_review_assigned`; reviewers can close the loop with `scripts/record_human_review.py`, which HMACs the raw reviewer ID with `MULTI_LLM_REVIEW_HMAC_KEY`, redacts the rationale, appends `human_review_completed`, and records `human_override_recorded` for modified, rejected, or escalated outcomes. `resolve_trace_state()` replays sanitized audit events to derive the terminal trace status.
+
+```bash
+export MULTI_LLM_REVIEW_HMAC_KEY=local-demo-secret
+python scripts/record_human_review.py --trace-id TRACE_ID --reviewer-id reviewer-123 --decision accepted --rationale "Reviewed against supplied documentation."
+```
 
 Trust boundary note: the local ADK process receives user input, but no model should receive raw PHI/PII by default. The MVP redacts the ADK model request before the Gemini router call and redacts again before third-party provider calls. Raw PHI/PII may still exist in ADK session state/history or platform logs before callback redaction; production requires ingest-time redaction before session write and strict content-logging controls.
 

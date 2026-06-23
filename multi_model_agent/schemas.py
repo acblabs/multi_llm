@@ -54,6 +54,12 @@ _SCHEMA_BARE_DATE_RE = re.compile(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b")
 _SCHEMA_REFERENCE_PERSON_RE = re.compile(
     r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2}\b"
 )
+_SCHEMA_REVIEW_SAFE_PERSON_PHRASES = {
+    "Human Review",
+    "Prior Authorization",
+    "Clinical Operations",
+    "Responsible AI",
+}
 
 
 class PrivacyFinding(BaseModel):
@@ -284,6 +290,50 @@ class EscalationDecision(BaseModel):
         return self.model_dump(mode="json")
 
 
+HumanReviewDecisionValue = Literal["accepted", "modified", "rejected", "escalated"]
+
+
+class HumanReviewDecision(BaseModel):
+    trace_id: str
+    reviewer_role: str
+    reviewer_id_hmac: str
+    decision: HumanReviewDecisionValue
+    rationale: str
+    reviewed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_safe_dict(self) -> dict[str, Any]:
+        return {
+            "trace_id": _safe_schema_identifier(self.trace_id, label="trace"),
+            "reviewer_role": _safe_schema_identifier(
+                self.reviewer_role,
+                label="reviewer_role",
+            ),
+            "reviewer_id_hmac": _safe_schema_identifier(
+                self.reviewer_id_hmac,
+                label="reviewer",
+            ),
+            "decision": self.decision,
+            "rationale": sanitize_review_rationale_text(self.rationale),
+            "reviewed_at": _format_schema_datetime_utc(self.reviewed_at),
+        }
+
+
+class TraceState(BaseModel):
+    trace_id: str
+    latest_risk_tier: str | None = None
+    latest_policy_action: str | None = None
+    human_review_required: bool = False
+    human_review_assigned: bool = False
+    human_review_completed: bool = False
+    final_human_review_decision: HumanReviewDecisionValue | None = None
+    final_human_review_rationale: str | None = None
+    reviewer_role: str | None = None
+    reviewer_id_hmac: str | None = None
+    audit_chain_valid: bool = False
+    audit_chain_errors: list[str] = Field(default_factory=list)
+    event_count: int = 0
+
+
 class AuditEvent(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     trace_id: str
@@ -408,6 +458,27 @@ def _redact_schema_text(value: str) -> str:
     redacted = _SCHEMA_MEMBER_ID_RE.sub("[MEMBER_ID]", redacted)
     redacted = _SCHEMA_PATIENT_NAME_RE.sub("[PATIENT_NAME]", redacted)
     return _SCHEMA_BARE_DATE_RE.sub("[DATE]", redacted)
+
+
+def sanitize_review_rationale_text(value: str) -> str:
+    redacted = _redact_schema_text(value)
+    return _SCHEMA_REFERENCE_PERSON_RE.sub(_replace_schema_review_person, redacted)
+
+
+def _replace_schema_review_person(match: re.Match[str]) -> str:
+    phrase = match.group(0)
+    if phrase in _SCHEMA_REVIEW_SAFE_PERSON_PHRASES:
+        return phrase
+    return "[PERSON]"
+
+
+def _format_schema_datetime_utc(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat(timespec="microseconds").replace(
+        "+00:00",
+        "Z",
+    )
 
 
 def _safe_schema_reference_text(value: str, *, label: str) -> str:

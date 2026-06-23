@@ -25,10 +25,12 @@ from .schemas import (
     EvidenceCoverageReport,
     GovernanceDecisionExplanation,
     GovernanceContext,
+    HumanReviewDecision,
     PrivacyAssessment,
     PrivacyFinding,
     RiskTier,
     StoredAuditEvent,
+    sanitize_review_rationale_text,
 )
 
 
@@ -36,6 +38,7 @@ SAFE_DETAIL_KEYS = {
     "action",
     "allowed_providers",
     "attempt",
+    "assigned_at",
     "contains_sensitive_data",
     "cost_usd",
     "error_category",
@@ -46,17 +49,27 @@ SAFE_DETAIL_KEYS = {
     "finding_kinds",
     "governance_explanation",
     "governance_explanations",
+    "human_review_decision",
+    "human_review_assigned",
+    "human_review_completed",
     "human_review_required",
     "input_tokens",
     "max_retries",
     "model",
     "model_provenance",
     "output_tokens",
+    "override_rationale",
     "policy_ids",
     "provider",
     "reason_codes",
     "redaction_count",
     "redaction_summary",
+    "review_decision",
+    "review_rationale",
+    "review_status",
+    "reviewed_at",
+    "reviewer_id_hmac",
+    "reviewer_role",
     "requires_human_review",
     "retryable",
     "risk_tier",
@@ -185,6 +198,8 @@ def safe_audit_details(details: Any) -> dict[str, Any]:
         return {"governance_explanation": _safe_governance_explanation(details)}
     if isinstance(details, EvidenceCoverageReport):
         return {"evidence_coverage_report": _safe_evidence_coverage_report(details)}
+    if isinstance(details, HumanReviewDecision):
+        return {"human_review_decision": _safe_human_review_decision(details)}
     if isinstance(details, GovernanceContext):
         return _sanitize_mapping(details.to_safe_dict())
     safe = _sanitize_mapping(details if isinstance(details, dict) else {"value": details})
@@ -564,6 +579,20 @@ def _safe_evidence_coverage_report(value: Any) -> dict[str, Any]:
     return report.to_safe_dict()
 
 
+def _safe_human_review_decision(value: Any) -> dict[str, Any]:
+    if isinstance(value, HumanReviewDecision):
+        decision = value
+    elif isinstance(value, dict):
+        try:
+            decision = HumanReviewDecision.model_validate(value)
+        except Exception:
+            return {}
+    else:
+        return {}
+
+    return decision.to_safe_dict()
+
+
 def _safe_identifier(value: str, *, label: str) -> str:
     if _SAFE_IDENTIFIER_RE.fullmatch(value):
         return value
@@ -625,6 +654,17 @@ def _sanitize_mapping(value: dict[str, Any]) -> dict[str, Any]:
                 result["evidence_coverage_report"] = safe_report
             continue
 
+        if normalized_key == "human_review_decision":
+            safe_decision = _safe_human_review_decision(item)
+            if safe_decision:
+                result["human_review_decision"] = safe_decision
+            continue
+
+        if normalized_key in {"review_rationale", "override_rationale"}:
+            if isinstance(item, str):
+                result[normalized_key] = sanitize_review_rationale_text(item)
+            continue
+
         if normalized_key == "token_counts":
             safe_token_counts = _sanitize_token_counts(item)
             if safe_token_counts:
@@ -662,6 +702,8 @@ def _sanitize_value(value: Any) -> Any:
         return _safe_decision_factor(value)
     if isinstance(value, EvidenceCoverageReport):
         return _safe_evidence_coverage_report(value)
+    if isinstance(value, HumanReviewDecision):
+        return _safe_human_review_decision(value)
     if isinstance(value, GovernanceContext):
         return _sanitize_mapping(value.to_safe_dict())
     if isinstance(value, BaseModel):

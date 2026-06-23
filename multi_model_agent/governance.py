@@ -9,6 +9,7 @@ from .explainer import (
 from .observability import new_trace_id, record_metric
 from .policy import evaluate_provider_access
 from .privacy import redact_sensitive_data
+from .review import record_human_review_assignment
 from .risk import classify_request
 from .schemas import (
     GovernanceContext,
@@ -247,6 +248,15 @@ def _record_governance_events(
             "governance_explanation": safe_hitl_explanation,
         },
     )
+    if context.escalation.required:
+        record_human_review_assignment(
+            trace_id=context.trace_id,
+            target_queue=context.escalation.target_queue,
+            risk_tier=context.risk.risk_tier,
+            reason_codes=context.escalation.reason_codes,
+            policy_ids=context.escalation.policy_ids,
+        )
+
     if context.evidence_coverage_report is not None:
         append_audit_event(
             trace_id=context.trace_id,
