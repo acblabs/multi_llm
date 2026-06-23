@@ -15,6 +15,7 @@ from multi_model_agent.audit_store import (
     sanitize_for_persistence,
 )
 from multi_model_agent.escalation import assess_human_escalation
+from multi_model_agent.explainer import collect_governance_explanations
 from multi_model_agent.policy import evaluate_provider_access
 from multi_model_agent.privacy import redact_sensitive_data, safe_privacy_assessment
 from multi_model_agent.risk import classify_request
@@ -236,6 +237,13 @@ class AuditPrivacyTests(unittest.TestCase):
             risk=risk,
             privacy=privacy,
         )
+        explanations = collect_governance_explanations(
+            trace_id="trace-context",
+            privacy=privacy,
+            risk=risk,
+            policy_decision=policy,
+            escalation=escalation,
+        )
         context = GovernanceContext(
             trace_id="trace-context",
             original_prompt=PHI_TEXT,
@@ -244,6 +252,7 @@ class AuditPrivacyTests(unittest.TestCase):
             risk=risk,
             escalation=escalation,
             policy_decisions=[policy],
+            explanations=explanations,
         )
 
         safe_view = context.to_safe_dict()
@@ -252,6 +261,7 @@ class AuditPrivacyTests(unittest.TestCase):
         self.assertNotIn("original_prompt", serialized)
         self.assertNotIn("governed_prompt", serialized)
         self.assertNotIn("original_text", serialized)
+        self.assertTrue(safe_view["governance_explanations"])
         for raw_value in RAW_PHI_STRINGS:
             self.assertNotIn(raw_value, serialized)
 

@@ -3,8 +3,10 @@ from typing import Any
 from google.adk.models.llm_request import LlmRequest
 
 from .audit import append_audit_event
+from .explainer import explain_redaction_decision
 from .observability import ensure_trace_id, new_trace_id
 from .privacy import redact_sensitive_data
+from .schemas import PrivacyAssessment, PrivacyFinding
 
 
 def redact_before_model(callback_context: Any, llm_request: LlmRequest):
@@ -16,6 +18,7 @@ def redact_before_model(callback_context: Any, llm_request: LlmRequest):
     trace_id = _trace_id_from_context(callback_context)
     redaction_count = 0
     finding_kinds: set[str] = set()
+    safe_findings: list[PrivacyFinding] = []
 
     for content in llm_request.contents:
         if not getattr(content, "parts", None):
@@ -31,6 +34,26 @@ def redact_before_model(callback_context: Any, llm_request: LlmRequest):
                 part.text = assessment.redacted_text
                 redaction_count += len(assessment.findings)
                 finding_kinds.update(finding.kind for finding in assessment.findings)
+                safe_findings.extend(
+                    PrivacyFinding(
+                        kind=finding.kind,
+                        value="",
+                        replacement=finding.replacement,
+                    )
+                    for finding in assessment.findings
+                )
+
+    privacy_summary = PrivacyAssessment(
+        original_text="",
+        redacted_text="",
+        findings=safe_findings,
+        contains_sensitive_data=redaction_count > 0,
+    )
+    explanation = explain_redaction_decision(
+        trace_id=trace_id,
+        privacy=privacy_summary,
+        target="gemini_router",
+    )
 
     append_audit_event(
         trace_id=trace_id,
@@ -40,6 +63,7 @@ def redact_before_model(callback_context: Any, llm_request: LlmRequest):
             "redaction_count": redaction_count,
             "finding_kinds": sorted(finding_kinds),
             "target": "gemini_router",
+            "governance_explanation": explanation.to_safe_dict(),
         },
     )
 

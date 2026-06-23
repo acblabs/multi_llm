@@ -21,6 +21,8 @@ from .privacy import redact_sensitive_data
 from .schemas import (
     AuditEvent,
     AuditVerificationResult,
+    DecisionFactor,
+    GovernanceDecisionExplanation,
     GovernanceContext,
     PrivacyAssessment,
     PrivacyFinding,
@@ -41,6 +43,8 @@ SAFE_DETAIL_KEYS = {
     "fallback_to",
     "finding_counts_by_kind",
     "finding_kinds",
+    "governance_explanation",
+    "governance_explanations",
     "human_review_required",
     "input_tokens",
     "max_retries",
@@ -176,6 +180,8 @@ def sanitize_for_persistence(event: AuditEvent | dict[str, Any]) -> dict[str, An
 def safe_audit_details(details: Any) -> dict[str, Any]:
     if isinstance(details, PrivacyAssessment):
         return details.to_safe_dict()
+    if isinstance(details, GovernanceDecisionExplanation):
+        return {"governance_explanation": _safe_governance_explanation(details)}
     if isinstance(details, GovernanceContext):
         return _sanitize_mapping(details.to_safe_dict())
     safe = _sanitize_mapping(details if isinstance(details, dict) else {"value": details})
@@ -501,6 +507,46 @@ def _sanitize_token_counts(value: Any) -> dict[str, int]:
     return result
 
 
+def _safe_governance_explanations(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+
+    explanations: list[dict[str, Any]] = []
+    for item in value:
+        safe_item = _safe_governance_explanation(item)
+        if safe_item:
+            explanations.append(safe_item)
+    return explanations
+
+
+def _safe_governance_explanation(value: Any) -> dict[str, Any]:
+    if isinstance(value, GovernanceDecisionExplanation):
+        explanation = value
+    elif isinstance(value, dict):
+        try:
+            explanation = GovernanceDecisionExplanation.model_validate(value)
+        except Exception:
+            return {}
+    else:
+        return {}
+
+    return explanation.to_safe_dict()
+
+
+def _safe_decision_factor(value: Any) -> dict[str, Any]:
+    if isinstance(value, DecisionFactor):
+        factor = value
+    elif isinstance(value, dict):
+        try:
+            factor = DecisionFactor.model_validate(value)
+        except Exception:
+            return {}
+    else:
+        return {}
+
+    return factor.to_safe_dict()
+
+
 def _safe_identifier(value: str, *, label: str) -> str:
     if _SAFE_IDENTIFIER_RE.fullmatch(value):
         return value
@@ -544,6 +590,18 @@ def _sanitize_mapping(value: dict[str, Any]) -> dict[str, Any]:
                 result["model_provenance"] = safe_provenance
             continue
 
+        if normalized_key in {"governance_explanation", "explanation"}:
+            safe_explanation = _safe_governance_explanation(item)
+            if safe_explanation:
+                result["governance_explanation"] = safe_explanation
+            continue
+
+        if normalized_key in {"governance_explanations", "explanations"}:
+            safe_explanations = _safe_governance_explanations(item)
+            if safe_explanations:
+                result["governance_explanations"] = safe_explanations
+            continue
+
         if normalized_key == "token_counts":
             safe_token_counts = _sanitize_token_counts(item)
             if safe_token_counts:
@@ -575,6 +633,10 @@ def _sanitize_value(value: Any) -> Any:
         return value.to_safe_dict()
     if isinstance(value, PrivacyFinding):
         return value.to_safe_dict()
+    if isinstance(value, GovernanceDecisionExplanation):
+        return _safe_governance_explanation(value)
+    if isinstance(value, DecisionFactor):
+        return _safe_decision_factor(value)
     if isinstance(value, GovernanceContext):
         return _sanitize_mapping(value.to_safe_dict())
     if isinstance(value, BaseModel):

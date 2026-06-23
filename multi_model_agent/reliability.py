@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import TypeVar
 
 from .audit import append_audit_event
+from .explainer import explain_retry_decision
 
 
 T = TypeVar("T")
@@ -38,6 +39,13 @@ def retry_with_backoff(
             return func()
         except Exception as error:
             error_type = classify_error(error)
+            explanation = explain_retry_decision(
+                trace_id=trace_id,
+                provider=provider,
+                action=error_type,
+                attempt=attempt + 1,
+                max_retries=max_retries,
+            )
             append_audit_event(
                 trace_id=trace_id,
                 event_type="provider_retry_decision",
@@ -47,6 +55,7 @@ def retry_with_backoff(
                     "attempt": attempt + 1,
                     "max_retries": max_retries,
                     "error": str(error),
+                    "governance_explanation": explanation.to_safe_dict(),
                 },
             )
 
